@@ -3,8 +3,8 @@ import type { FileRouter, StorageProvider } from "./types";
 import type { TransformPath } from "./utils";
 
 export type UploadReturnType = {
-	providerUrl?: string;
-	fileStorageUrl: string;
+	providerURL?: string;
+	fileStorageURL: string;
 }[];
 export type DeleteReturnType = void;
 
