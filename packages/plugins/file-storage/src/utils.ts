@@ -1,5 +1,4 @@
 import type { LiteralString } from "better-auth";
-import { fileTypeFromBuffer } from "file-type";
 
 export function transformPath<T extends LiteralString>(
 	path: T,
@@ -27,11 +26,3 @@ export type TransformPath<S extends string> =
 		: S extends `${infer Head}-${infer Tail}`
 			? TransformPath<`${Head}${CapitalizeFirst<Tail>}`>
 			: CapitalizeFirst<S>;
-
-export async function detectFileTypeFromBlob(blob: Blob) {
-	const arrayBuffer = await blob.arrayBuffer(); // convert blob to ArrayBuffer
-	const uint8Array = new Uint8Array(arrayBuffer); // required by file-type
-
-	const fileType = await fileTypeFromBuffer(uint8Array);
-	return fileType; // returns { ext: "png", mime: "image/png" } or undefined
-}

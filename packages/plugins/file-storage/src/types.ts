@@ -1,60 +1,78 @@
-import type { LogLevel, Session, User } from "better-auth";
+import type { MultipartPart } from "@remix-run/multipart-parser";
+import type { GenericEndpointContext, Session, User } from "better-auth";
 
-export type StorageLogger = Record<
-	LogLevel,
-	(message: string, ...args: any[]) => void
->;
+export type StorageProvider<O = {}> = {
+	upload: (params: {
+		part: MultipartPart;
+		key: string;
+		route: FileRoute & O;
+		context: GenericEndpointContext;
+	}) => Promise<{
+		key?: string;
+		providerUrl?: string;
+		eTag?: string;
+	}>;
 
-/**
- * Storage provider interface for profile images, allowing you
- * to use any storage provider you want.
- */
-export interface StorageProvider {
+	delete: (params: {
+		fileURL: string;
+	}) => Promise<void>;
+
+	$Infer?: {
+		Options?: O;
+	};
+};
+
+export type FileStorageOptions<
+	P extends StorageProvider<any>,
+	R extends FileRouter<P>,
+> = {
 	/**
-	 * Upload a file
+	 * Storage provider used for file actions
 	 */
-	uploadFile: (
-		params: {
-			file: File;
-		},
-		logger: StorageLogger,
-	) => Promise<{ url: string; key: string }>;
+	provider: P;
 
-	/**
-	 * Delete a file from storage
-	 */
-	deleteFile: (
-		params: {
-			/**
-			 * Can either be a file storage URL or a provider URL
-			 */
-			url: string;
-		},
-		logger: StorageLogger,
-	) => Promise<void>;
-}
-
-export interface FileStorageOptions<
-	FileRouter extends { [key: string]: FileRoute },
-> {
-	/**
-	 * Storage provider to use for file uploads
-	 */
-	storageProvider: StorageProvider;
 	/**
 	 * An object of routes which define the rules of file uploads.
 	 */
-	fileRouter: FileRouter;
-}
+	router: R;
+};
 
-export type FileRoute = {
+export type FileRouter<P extends StorageProvider<any> = StorageProvider> = {
+	[key: string]: FileRoute<P>;
+};
+
+export type FileRoute<P extends StorageProvider<any> = StorageProvider> = {
+	/**
+	 * Maximum amount of files to upload
+	 * @default Number.POSITIVE_INFINITY
+	 */
+	maxFiles?:
+		| number
+		| ((session: {
+				user: User & Record<string, any>;
+				session: Session & Record<string, any>;
+		  }) => number | Promise<number>);
 	/**
 	 * Maximum file size in bytes
-	 * @default 5242880 (5MB)
+	 * @default 5_242_880 (5MB)
 	 */
 	maxSize?:
 		| number
-		| ((session: { user: User; session: Session }) => number | Promise<number>);
+		| ((session: {
+				user: User & Record<string, any>;
+				session: Session & Record<string, any>;
+		  }) => number | Promise<number>);
+
+	/**
+	 * Maximum header size in bytes
+	 * @default 2_048 (2KiB)
+	 */
+	maxHeaderSize?:
+		| number
+		| ((session: {
+				user: User & Record<string, any>;
+				session: Session & Record<string, any>;
+		  }) => number | Promise<number>);
 
 	/**
 	 * Allowed file MIME types
@@ -62,23 +80,42 @@ export type FileRoute = {
 	 */
 	allowedTypes?:
 		| string[]
-		| ((session: { user: User; session: Session }) =>
-				| string[]
-				| Promise<string[]>);
+		| ((session: {
+				user: User & Record<string, any>;
+				session: Session & Record<string, any>;
+		  }) => string[] | Promise<string[]>);
 
 	/**
-	 * Optional function to determine if a user/request is allowed to upload a file.
+	 * Function to determine if a user/request is allowed to upload a file.
 	 */
 	canUpload?: (
-		session: { user: User; session: Session } | null,
+		session: {
+			user: User & Record<string, any>;
+			session: Session & Record<string, any>;
+		} | null,
 		request: Request,
 	) => boolean | Promise<boolean>;
 
 	/**
-	 * Optional function to determine if a user/request is allowed to delete a file.
+	 * Function to determine if a user/request is allowed to delete a file.
 	 */
 	canDelete?: (
-		session: { user: User; session: Session } | null,
+		session: {
+			user: User & Record<string, any>;
+			session: Session & Record<string, any>;
+		} | null,
 		request: Request,
 	) => boolean | Promise<boolean>;
-};
+
+	/**
+	 * Callback function that gets executed server-side when an file is uploaded
+	 * @param params Object containing the file entry and user
+	 */
+	onFileUploaded?: (params: {
+		file: {
+			url: string;
+			key: string;
+		};
+		user: User & Record<string, any>;
+	}) => void | Promise<void>;
+} & (P extends { $Infer?: { Options?: infer O } } ? O : {});

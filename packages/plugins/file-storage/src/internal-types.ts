@@ -1,13 +1,11 @@
-import type { FileRoute } from "./types";
+import type { createAuthEndpoint, sessionMiddleware } from "better-auth/api";
+import type { FileRouter, StorageProvider } from "./types";
 import type { TransformPath } from "./utils";
-import type { createAuthEndpoint } from "better-auth/api";
-import type { z } from "zod";
 
 export type UploadReturnType = {
-	fileStorageURL: string;
-	providerURL: string;
-};
-
+	providerUrl?: string;
+	fileStorageUrl: string;
+}[];
 export type DeleteReturnType = void;
 
 export type EndpointPair = {
@@ -16,7 +14,15 @@ export type EndpointPair = {
 			`/file-storage/upload/${string}`,
 			{
 				method: "POST";
-				body: z.ZodType<File, z.ZodTypeDef, File>;
+				use: [typeof sessionMiddleware];
+				body: undefined;
+				metadata: {
+					$Infer: {
+						body: FormData;
+					};
+				};
+				requireRequest: true;
+				cloneRequest: true;
 			},
 			UploadReturnType
 		>
@@ -34,7 +40,7 @@ type PrefixedEndpoints<Path extends string> = {
 	[K in keyof EndpointPair as `${Extract<K, string>}${TransformPath<Path>}`]: EndpointPair[K];
 };
 
-export type FileRouterToEndpoints<R extends Record<string, FileRoute>> = {
+export type FileRouterToEndpoints<R extends FileRouter> = {
 	[K in keyof R & string]: PrefixedEndpoints<K>;
 };
 

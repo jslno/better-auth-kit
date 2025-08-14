@@ -26,17 +26,23 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
+		"@remix-run/multipart-parser": "^0.11.0",
 		"dotenv": "^16.5.0",
-		"file-type": "^20.5.0",
 		"zod": "^3.24.2"
 	},
 	"peerDependencies": {
-		"better-auth": "^1.1.21"
+		"better-auth": "^1.1.21",
+		"@aws-sdk/client-s3": "^3.864.0",
+		"@aws-sdk/lib-storage": "^3.864.0",
+		"uploadthing": "^6.13.3"
 	},
 	"devDependencies": {
+		"@aws-sdk/client-s3": "^3.864.0",
+		"@aws-sdk/lib-storage": "^3.864.0",
+		"uploadthing": "^6.13.3",
 		"@better-auth-kit/internal-build": "workspace:*",
-		"vitest": "^3.0.8",
-		"@better-auth-kit/tests": "workspace:*"
+		"@better-auth-kit/tests": "workspace:*",
+		"vitest": "^3.0.8"
 	},
 	"exports": {
 		".": {
@@ -46,6 +52,14 @@
 		"./client": {
 			"types": "./dist/client.d.ts",
 			"default": "./dist/client.js"
+		},
+		"./provider/aws-s3": {
+			"types": "./dist/providers/aws-s3.d.ts",
+			"default": "./dist/providers/aws-s3.js"
+		},
+		"./provider/uploadthing": {
+			"types": "./dist/providers/uploadthing.d.ts",
+			"default": "./dist/providers/uploadthing.js"
 		}
 	},
 	"publishConfig": {
