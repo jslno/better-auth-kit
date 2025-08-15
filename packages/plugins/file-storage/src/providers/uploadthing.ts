@@ -39,35 +39,38 @@ export const uploadThingProvider = <O extends UploadThingProviderOptions>(
 		},
 		delete: async ({ key, route }) => {
 			const { success } = await utapi.deleteFiles(key, {
-				keyType: "customId"
-			})
+				keyType: "customId",
+			});
 		},
 		read: async ({ url, route, context }) => {
 			if (!url) {
-				throw context.error("NOT_FOUND")
+				throw context.error("NOT_FOUND");
 			}
 
 			let contentType: string | undefined;
 
 			const { data, error } = await betterFetch(url, {
 				onResponse(context) {
-					contentType = context.response.headers.get("content-type")?.split(";")[0].trim();
+					contentType = context.response.headers
+						.get("content-type")
+						?.split(";")[0]
+						.trim();
 				},
 			});
 
 			if (error) {
 				context.context.logger.error(
 					`[Better-Auth-Kit: FileStorage] Failed to fetch file from URL: "${url}"\n`,
-					error
-				)
+					error,
+				);
 				throw context.error("INTERNAL_SERVER_ERROR");
 			}
 
 			return {
 				contentType: contentType ?? "application/octet-stream",
 				contentDisposition: route.contentDisposition,
-				content: data
-			}
+				content: data,
+			};
 		},
 		$Infer: {
 			Options: {} as {

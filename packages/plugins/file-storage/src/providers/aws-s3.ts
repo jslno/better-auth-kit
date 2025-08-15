@@ -55,8 +55,8 @@ export const awsS3Provider = <O extends AwsS3ProviderOptions>(options: O) => {
 			const command = new DeleteObjectCommand({
 				Bucket: route.bucket || options.bucket,
 				Key: key,
-			})
-			
+			});
+
 			await client.send(command);
 		},
 		read: async ({ key, route }) => {

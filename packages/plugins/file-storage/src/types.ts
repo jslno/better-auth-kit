@@ -22,14 +22,14 @@ export type StorageProvider<O = {}> = {
 
 	delete: (params: {
 		key: string;
-		url: string | undefined,
+		url: string | undefined;
 		route: FileRoute & O;
 		context: GenericEndpointContext;
 	}) => Promise<void>;
 
 	read: (params: {
 		key: string;
-		url: string | undefined,
+		url: string | undefined;
 		route: FileRoute & O;
 		context: GenericEndpointContext;
 	}) => Promise<{
@@ -77,20 +77,24 @@ export type FileRoute<P extends StorageProvider<any> = StorageProvider> = {
 	 */
 	maxFiles?:
 		| number
-		| ((session: {
-				user: User & Record<string, any>;
-				session: Session & Record<string, any>;
-		  } | null) => number | Promise<number>);
+		| ((
+				session: {
+					user: User & Record<string, any>;
+					session: Session & Record<string, any>;
+				} | null,
+		  ) => number | Promise<number>);
 	/**
 	 * Maximum file size in bytes
 	 * @default 5_242_880 (5MB)
 	 */
 	maxSize?:
 		| number
-		| ((session: {
-				user: User & Record<string, any>;
-				session: Session & Record<string, any>;
-		  } | null) => number | Promise<number>);
+		| ((
+				session: {
+					user: User & Record<string, any>;
+					session: Session & Record<string, any>;
+				} | null,
+		  ) => number | Promise<number>);
 
 	/**
 	 * Maximum header size in bytes
@@ -98,10 +102,12 @@ export type FileRoute<P extends StorageProvider<any> = StorageProvider> = {
 	 */
 	maxHeaderSize?:
 		| number
-		| ((session: {
-				user: User & Record<string, any>;
-				session: Session & Record<string, any>;
-		  } | null) => number | Promise<number>);
+		| ((
+				session: {
+					user: User & Record<string, any>;
+					session: Session & Record<string, any>;
+				} | null,
+		  ) => number | Promise<number>);
 
 	/**
 	 * Allowed file MIME types
@@ -109,17 +115,21 @@ export type FileRoute<P extends StorageProvider<any> = StorageProvider> = {
 	 */
 	allowedTypes?:
 		| string[]
-		| ((session: {
-				user: User & Record<string, any>;
-				session: Session & Record<string, any>;
-		  } | null) => string[] | Promise<string[]>);
+		| ((
+				session: {
+					user: User & Record<string, any>;
+					session: Session & Record<string, any>;
+				} | null,
+		  ) => string[] | Promise<string[]>);
 
 	metadata?:
 		| Record<string, any>
-		| ((session: {
-				user: User & Record<string, any>;
-				session: Session & Record<string, any>;
-		  } | null) => Record<string, any> | Promise<Record<string, any>>);
+		| ((
+				session: {
+					user: User & Record<string, any>;
+					session: Session & Record<string, any>;
+				} | null,
+		  ) => Record<string, any> | Promise<Record<string, any>>);
 
 	/**
 	 * Callback function that gets executed server-side when an file is uploaded
@@ -162,9 +172,11 @@ export type FileRoute<P extends StorageProvider<any> = StorageProvider> = {
 				key: string;
 				metadata: Record<string, any> | undefined;
 			}) => void | Promise<void>;
-			after?: (ctx: {
-				context: GenericEndpointContext
-			} & Awaited<ReturnType<StorageProvider["read"]>>) => void | Promise<void>;
+			after?: (
+				ctx: {
+					context: GenericEndpointContext;
+				} & Awaited<ReturnType<StorageProvider["read"]>>,
+			) => void | Promise<void>;
 		};
 	};
 } & (P extends { $Infer?: { Options?: infer O } } ? O : {});
