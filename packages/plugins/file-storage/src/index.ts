@@ -5,10 +5,7 @@ import type {
 	FileStorageOptions,
 	StorageProvider,
 } from "./types";
-import {
-	createAuthEndpoint,
-	APIError,
-} from "better-auth/api";
+import { createAuthEndpoint, APIError } from "better-auth/api";
 import {
 	MaxFileSizeExceededError,
 	MaxHeaderSizeExceededError,
@@ -209,7 +206,7 @@ export const fileStorage = <
 								});
 							}
 						},
-					)
+					),
 				});
 
 				return entries;
@@ -225,18 +222,21 @@ export const fileStorage = <
 			getFile: createAuthEndpoint(
 				"/fs/read/:path/:key",
 				{
-					method: "GET"
+					method: "GET",
+					metadata: {
+						SERVER_ONLY: true,
+					},
 				},
 				async (ctx) => {
 					let { path, key } = ctx.params;
-		
+
 					if (!path || !key) {
 						throw ctx.error("NOT_FOUND");
 					}
-		
+
 					const route: FileRoute & Record<string, any> = options.router[path];
 					const filename = key.split("/").pop()!;
-		
+
 					key = `${path}/${key}`;
 					const file = await ctx.context.adapter.findOne<{
 						url: string | undefined;
@@ -251,11 +251,11 @@ export const fileStorage = <
 						],
 						select: ["url", "metadata"],
 					});
-		
+
 					if (!file) {
 						throw ctx.error("NOT_FOUND");
 					}
-		
+
 					if (route.hooks?.read?.before) {
 						await route.hooks.read.before({
 							context: ctx,
@@ -263,16 +263,16 @@ export const fileStorage = <
 							metadata: file.metadata ? JSON.parse(file.metadata) : undefined,
 						});
 					}
-		
-					const readFile =
-					await options.provider.read({
-							key,
-							url: file.url,
-							context: ctx,
-							route,
-						});
-					const { content, contentType, contentCharset, contentDisposition } = readFile;
-		
+
+					const readFile = await options.provider.read({
+						key,
+						url: file.url,
+						context: ctx,
+						route,
+					});
+					const { content, contentType, contentCharset, contentDisposition } =
+						readFile;
+
 					const contentTypeStr = [
 						contentType ?? "application/octet-stream",
 						contentCharset ? `charset=${contentCharset}` : null,
@@ -283,10 +283,10 @@ export const fileStorage = <
 					if (route.hooks?.read?.after) {
 						await route.hooks.read.after({
 							context: ctx,
-							...readFile
+							...readFile,
 						});
 					}
-		
+
 					return new Response(content, {
 						headers: new Headers({
 							"Content-Type": contentTypeStr,
@@ -298,15 +298,18 @@ export const fileStorage = <
 			deleteFile: createAuthEndpoint(
 				"/fs/rm/:path/:key",
 				{
-					method: "POST"
+					method: "POST",
+					metadata: {
+						SERVER_ONLY: true,
+					},
 				},
 				async (ctx) => {
 					let { path, key } = ctx.params;
-		
+
 					if (!path || !key) {
 						throw ctx.error("NOT_FOUND");
 					}
-		
+
 					const route: FileRoute & Record<string, any> = options.router[path];
 					key = `${path}/${key}`;
 					const file = await ctx.context.adapter.findOne<{
@@ -322,32 +325,34 @@ export const fileStorage = <
 						],
 						select: ["url", "metadata"],
 					});
-		
+
 					if (!file) {
 						throw ctx.error("NOT_FOUND");
 					}
-				
+
 					if (route.hooks?.delete?.before) {
 						await route.hooks.delete.before({
 							context: ctx,
 							key,
-							metadata: file.metadata ? JSON.parse(file.metadata) : undefined
-						})
+							metadata: file.metadata ? JSON.parse(file.metadata) : undefined,
+						});
 					}
 
 					await options.provider.delete({
 						key,
 						url: file.url,
 						context: ctx,
-						route
-					})
+						route,
+					});
 
 					await ctx.context.adapter.delete({
 						model: "fileStorage",
-						where: [{
-							field: "key",
-							value: key,
-						}],
+						where: [
+							{
+								field: "key",
+								value: key,
+							},
+						],
 					});
 
 					if (route.hooks?.delete?.after) {
