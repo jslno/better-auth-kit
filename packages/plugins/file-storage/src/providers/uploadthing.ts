@@ -1,7 +1,7 @@
 import { UTFile, type UTApi } from "uploadthing/server";
 import { createStorageProvider } from ".";
-import type { Session, User } from "better-auth";
 import { ERROR_CODES } from "../error-codes";
+import { betterFetch } from "@better-fetch/fetch";
 
 export type UploadThingProviderOptions = {
 	utapi: UTApi;
@@ -14,11 +14,6 @@ export const uploadThingProvider = <O extends UploadThingProviderOptions>(
 
 	return createStorageProvider({
 		upload: async ({ part, key, route, context }) => {
-			const metadata =
-				typeof route.metadata === "function"
-					? await route.metadata(context.context.session!)
-					: route.metadata;
-
 			if (!part.filename) {
 				throw context.error("BAD_REQUEST", {
 					message: ERROR_CODES.UNABLE_TO_RETRIEVE_FILENAME,
@@ -32,7 +27,6 @@ export const uploadThingProvider = <O extends UploadThingProviderOptions>(
 
 			const { data } = (
 				await utapi.uploadFiles([file], {
-					metadata,
 					acl: route.acl ?? "private",
 					contentDisposition: route.contentDisposition,
 				})
@@ -43,25 +37,43 @@ export const uploadThingProvider = <O extends UploadThingProviderOptions>(
 				providerUrl: data?.url,
 			};
 		},
-		delete: async ({ fileURL }) => {},
+		delete: async ({ key, route }) => {
+			const { success } = await utapi.deleteFiles(key, {
+				keyType: "customId"
+			})
+		},
+		read: async ({ url, route, context }) => {
+			if (!url) {
+				throw context.error("NOT_FOUND")
+			}
+
+			let contentType: string | undefined;
+
+			const { data, error } = await betterFetch(url, {
+				onResponse(context) {
+					contentType = context.response.headers.get("content-type")?.split(";")[0].trim();
+				},
+			});
+
+			if (error) {
+				context.context.logger.error(
+					`[Better-Auth-Kit: FileStorage] Failed to fetch file from URL: "${url}"\n`,
+					error
+				)
+				throw context.error("INTERNAL_SERVER_ERROR");
+			}
+
+			return {
+				contentType: contentType ?? "application/octet-stream",
+				contentDisposition: route.contentDisposition,
+				content: data
+			}
+		},
 		$Infer: {
 			Options: {} as {
 				contentDisposition?: "inline" | "attachment";
 				acl?: "public-read" | "private";
-				metadata?:
-					| Json
-					| ((session: {
-							user: User & Record<string, any>;
-							session: Session & Record<string, any>;
-					  }) => Json | Promise<Json>);
 			},
 		},
 	});
 };
-
-type JsonValue = string | number | boolean | null | undefined;
-type JsonArray = JsonValue[];
-type JsonObject = {
-	[key: string]: JsonValue | JsonObject | JsonArray;
-};
-type Json = JsonValue | JsonObject | JsonArray;

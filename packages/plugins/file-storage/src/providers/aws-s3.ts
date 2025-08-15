@@ -1,7 +1,12 @@
-import type { ObjectCannedACL, S3, S3Client } from "@aws-sdk/client-s3";
+import {
+	DeleteObjectCommand,
+	GetObjectCommand,
+	type ObjectCannedACL,
+	type S3,
+	type S3Client,
+} from "@aws-sdk/client-s3";
 import { Upload } from "@aws-sdk/lib-storage";
 import { createStorageProvider } from ".";
-import type { Session, User } from "better-auth";
 
 export type AwsS3ProviderOptions = {
 	client: S3 | S3Client;
@@ -26,12 +31,7 @@ export const awsS3Provider = <O extends AwsS3ProviderOptions>(options: O) => {
 	};
 
 	return createStorageProvider({
-		upload: async ({ part, key, route, context }) => {
-			const metadata =
-				typeof route.metadata === "function"
-					? await route.metadata(context.context.session!)
-					: route.metadata;
-
+		upload: async ({ part, key, route }) => {
 			const upload = new Upload({
 				client,
 				params: {
@@ -39,7 +39,6 @@ export const awsS3Provider = <O extends AwsS3ProviderOptions>(options: O) => {
 					Key: key,
 					Body: streamFromChunks(part.content),
 					ContentType: part.mediaType ?? "application/octet-stream",
-					Metadata: metadata,
 					ACL: route.ACL ?? "private",
 				},
 			});
@@ -52,18 +51,35 @@ export const awsS3Provider = <O extends AwsS3ProviderOptions>(options: O) => {
 				eTag: response.ETag,
 			};
 		},
-		delete: async ({ fileURL }) => {},
+		delete: async ({ key, url, route }) => {
+			const command = new DeleteObjectCommand({
+				Bucket: route.bucket || options.bucket,
+				Key: key,
+			})
+			
+			await client.send(command);
+		},
+		read: async ({ key, route }) => {
+			const command = new GetObjectCommand({
+				Bucket: route.bucket || options.bucket,
+				Key: key,
+			});
+			const result = await client.send(command);
+
+			return {
+				metadata: result.Metadata,
+				eTag: result.ETag,
+				contentType: result.ContentType,
+				contentLength: result.ContentLength,
+				contentCharset: result.ContentEncoding,
+				content: result.Body?.transformToWebStream(),
+			};
+		},
 
 		$Infer: {
 			Options: {} as {
 				bucket?: string;
 				ACL?: ObjectCannedACL;
-				metadata?:
-					| Record<string, string>
-					| ((session: {
-							user: User & Record<string, any>;
-							session: Session & Record<string, any>;
-					  }) => Record<string, string> | Promise<Record<string, string>>);
 			},
 		},
 	});

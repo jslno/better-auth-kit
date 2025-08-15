@@ -6,7 +6,6 @@ export type UploadReturnType = {
 	providerURL?: string;
 	fileStorageURL: string;
 }[];
-export type DeleteReturnType = void;
 
 export type EndpointPair = {
 	upload: ReturnType<
@@ -25,13 +24,6 @@ export type EndpointPair = {
 				cloneRequest: true;
 			},
 			UploadReturnType
-		>
-	>;
-	delete: ReturnType<
-		typeof createAuthEndpoint<
-			`/file-storage/delete/${string}`,
-			{ method: "POST" },
-			DeleteReturnType
 		>
 	>;
 };
