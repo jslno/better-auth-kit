@@ -81,6 +81,9 @@ export const onboarding = <Schema extends Record<string, any>>(
 		],
 		schema: mergeSchema(schema, opts?.schema),
 		$ERROR_CODES: ONBOARDING_ERROR_CODES,
+		$Infer: {
+			OnboardingInput: {} as Schema,
+		},
 	} satisfies BetterAuthPlugin;
 };
 
