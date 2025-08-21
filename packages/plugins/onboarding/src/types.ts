@@ -6,7 +6,9 @@ import type {
 import type { ZodSchema } from "zod";
 import type { schema } from "./schema";
 
-type ActionEndpointContext<Schema extends Record<string, any>> = (
+type ActionEndpointContext<
+	Schema extends Record<string, any> = Record<string, any>,
+> = (
 	ctx: EndpointContext<
 		string,
 		{
@@ -18,7 +20,9 @@ type ActionEndpointContext<Schema extends Record<string, any>> = (
 	},
 ) => boolean | Promise<boolean>;
 
-export type OnboardingOptions<Schema extends Record<string, any>> = {
+export type OnboardingOptions<
+	Schema extends Record<string, any> = Record<string, any>,
+> = {
 	input: ZodSchema<Schema>;
 	onComplete: ActionEndpointContext<Schema>;
 	autoEnableOnSignUp?: boolean;
