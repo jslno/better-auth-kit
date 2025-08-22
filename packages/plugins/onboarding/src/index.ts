@@ -28,8 +28,11 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 		...options,
 	};
 
+	const steps = Object.entries(options.steps);
+
+	const requiredSteps = steps.filter(([_, step]) => step.required);
 	const endpoints = Object.fromEntries(
-		Object.entries(options.steps).flatMap(([id, step]) => {
+		steps.flatMap(([id, step]) => {
 			const isCompletionStep = options.completionStep === id;
 			const key = transformPath(id);
 			const path = transformClientPath(id);
@@ -67,6 +70,18 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 						if (step.once && completedSteps.has(id)) {
 							throw new APIError("FORBIDDEN", {
 								message: ONBOARDING_ERROR_CODES.STEP_ALREADY_COMPLETED,
+							});
+						}
+
+						if (
+							isCompletionStep &&
+							requiredSteps
+								.filter(([key]) => key !== id)
+								.some(([key]) => !completedSteps.has(key))
+						) {
+							throw new APIError("FORBIDDEN", {
+								message:
+									ONBOARDING_ERROR_CODES.COMPLETE_REQUIRED_STEPS_BEFORE_COMPLETING_ONBOARDING,
 							});
 						}
 

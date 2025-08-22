@@ -34,7 +34,24 @@ export type OnboardingStep<
 	Schema extends Record<string, any> | undefined | null = any,
 	Result = unknown,
 > = {
+	/**
+	 * Optional Zod schema used to validate the request body for this step.
+	 * If omitted, the handler receives the raw body without validation.
+	 */
 	input?: ZodSchema<Schema>;
+	/**
+	 * The function executed for this step. Receives the validated body (if an
+	 * `input` schema is provided) and the endpoint context. Can be async and
+	 * should return the step result.
+	 */
 	handler: ActionEndpointContext<Schema, Result>;
+	/**
+	 * If true, this step can be completed only once per user. Subsequent
+	 * attempts should be treated as no-ops or rejected.
+	 */
 	once?: boolean;
+	/**
+	 * If true, this step must be completed before onboarding is considered done.
+	 */
+	required?: boolean;
 };
