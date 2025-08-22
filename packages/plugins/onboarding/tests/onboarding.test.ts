@@ -219,75 +219,75 @@ describe("Onboarding", () => {
 			expect(mockOnboardingRedirect).not.toHaveBeenCalled();
 		});
 	});
-});
 
-describe("Onboarding (required steps)", async () => {
-	const auth = getAuth({
-		steps: {
-			profile: {
-				handler: async () => true,
-				required: true,
-			},
-			newPassword: {
-				handler: async () => true,
-			},
-		},
-		completionStep: "newPassword" as any,
-	} as any);
-
-	const { resetDatabase, client, signUpWithTestUser, db, testUser } =
-		await getTestInstance(auth, {
-			clientOptions: {
-				plugins: [
-					onboardingClient({
-						onOnboardingRedirect: () => Promise.resolve(),
-					}),
-				],
-			},
-		});
-
-	let headers: Headers;
-	beforeAll(async () => {
-		await resetDatabase();
-		const result = await signUpWithTestUser();
-		headers = result.headers;
-	});
-
-	beforeEach(async () => {
-		await db.update({
-			model: "user",
-			where: [
-				{
-					field: "email",
-					value: testUser.email,
+	describe("(required steps)", async () => {
+		const auth = getAuth({
+			steps: {
+				profile: {
+					handler: async () => true,
+					required: true,
 				},
-			],
-			update: {
-				shouldOnboard: true,
-				completedSteps: "[]",
+				newPassword: {
+					handler: async () => true,
+				},
 			},
-		});
-	});
+			completionStep: "newPassword" as any,
+		} as any);
 
-	it("should forbid completing completion step before required steps", async () => {
-		const res = await (client.onboarding as any).step.newPassword({
-			fetchOptions: { headers },
-		});
-		expect(res.error?.status).toBe(403);
-		expect(res.error?.message).toBe(
-			ONBOARDING_ERROR_CODES.COMPLETE_REQUIRED_STEPS_BEFORE_COMPLETING_ONBOARDING,
-		);
-	});
+		const { resetDatabase, client, signUpWithTestUser, db, testUser } =
+			await getTestInstance(auth, {
+				clientOptions: {
+					plugins: [
+						onboardingClient({
+							onOnboardingRedirect: () => Promise.resolve(),
+						}),
+					],
+				},
+			});
 
-	it("should allow completion after required steps are completed", async () => {
-		const r1 = await (client.onboarding as any).step.profile({
-			fetchOptions: { headers },
+		let headers: Headers;
+		beforeAll(async () => {
+			await resetDatabase();
+			const result = await signUpWithTestUser();
+			headers = result.headers;
 		});
-		if (r1.error) throw r1.error;
-		const r2 = await (client.onboarding as any).step.newPassword({
-			fetchOptions: { headers },
+
+		beforeEach(async () => {
+			await db.update({
+				model: "user",
+				where: [
+					{
+						field: "email",
+						value: testUser.email,
+					},
+				],
+				update: {
+					shouldOnboard: true,
+					completedSteps: "[]",
+				},
+			});
 		});
-		if (r2.error) throw r2.error;
-		expect(r2.data.completedSteps).toEqual(["profile", "newPassword"]);
+
+		it("should forbid completing completion step before required steps", async () => {
+			const res = await (client.onboarding as any).step.newPassword({
+				fetchOptions: { headers },
+			});
+			expect(res.error?.status).toBe(403);
+			expect(res.error?.message).toBe(
+				ONBOARDING_ERROR_CODES.COMPLETE_REQUIRED_STEPS_BEFORE_COMPLETING_ONBOARDING,
+			);
+		});
+
+		it("should allow completion after required steps are completed", async () => {
+			const r1 = await (client.onboarding as any).step.profile({
+				fetchOptions: { headers },
+			});
+			if (r1.error) throw r1.error;
+			const r2 = await (client.onboarding as any).step.newPassword({
+				fetchOptions: { headers },
+			});
+			if (r2.error) throw r2.error;
+			expect(r2.data.completedSteps).toEqual(["profile", "newPassword"]);
+		});
 	});
 });
