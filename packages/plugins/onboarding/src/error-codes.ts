@@ -1,4 +1,4 @@
 export const ONBOARDING_ERROR_CODES = {
 	ALREADY_ONBOARDED: "Already onboarded",
-	FAILED_TO_COMPLETE_ONBOARDING: "Failed to complete onboarding."
+	STEP_ALREADY_COMPLETED: "Step already completed.",
 } as const;

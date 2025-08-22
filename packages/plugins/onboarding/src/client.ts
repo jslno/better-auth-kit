@@ -1,4 +1,4 @@
-import type { BetterAuthClientPlugin, BetterAuthPlugin } from "better-auth";
+import type { BetterAuthClientPlugin } from "better-auth";
 import type { onboarding, OnboardingStep } from ".";
 
 type InferSteps<T> = T extends {

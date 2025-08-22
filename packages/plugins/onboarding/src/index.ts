@@ -1,8 +1,4 @@
-import {
-	betterAuth,
-	type BetterAuthPlugin,
-	type PrettifyDeep,
-} from "better-auth";
+import type { BetterAuthPlugin, PrettifyDeep } from "better-auth";
 import { mergeSchema } from "better-auth/db";
 import { schema } from "./schema";
 import { ONBOARDING_ERROR_CODES } from "./error-codes";
@@ -10,9 +6,9 @@ import {
 	createAuthEndpoint,
 	createAuthMiddleware,
 	APIError,
+	sessionMiddleware,
 } from "better-auth/api";
 import { shouldOnboard } from "./routes/should-onboard";
-import { completeOnboarding } from "./routes/complete-onboard";
 import type { OnboardingOptions, OnboardingStep } from "./types";
 import type {
 	CanAccessOnboardingStepReturnType,
@@ -44,6 +40,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 					{
 						method: "POST",
 						body: step.input,
+						use: [sessionMiddleware],
 					},
 					async (ctx): Promise<OnboardingStepReturnType<typeof step>> => {
 						const { session } = await verifyOnboarding(ctx);
@@ -67,7 +64,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 
 						if (step.once && completedSteps.has(id)) {
 							throw new APIError("FORBIDDEN", {
-								message: "Already completed this step",
+								message: ONBOARDING_ERROR_CODES.STEP_ALREADY_COMPLETED,
 							});
 						}
 
@@ -102,6 +99,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 					`/onboarding/can-access-step/${path}`,
 					{
 						method: "GET",
+						use: [sessionMiddleware],
 						metadata: {
 							SERVER_ONLY: true,
 						},
@@ -125,7 +123,6 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 		id: "onboarding",
 		endpoints: {
 			shouldOnboard,
-			completeOnboarding: completeOnboarding(opts),
 			...endpoints,
 		},
 		hooks: {

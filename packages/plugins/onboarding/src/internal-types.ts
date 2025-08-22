@@ -1,4 +1,4 @@
-import type { createAuthEndpoint } from "better-auth/api";
+import type { createAuthEndpoint, sessionMiddleware } from "better-auth/api";
 import type { OnboardingStep } from "./types";
 import type { ZodSchema } from "zod";
 import type { TransformClientPath, TransformPath } from "./utils";
@@ -31,6 +31,7 @@ export type EndpointPair<Path extends string, K extends OnboardingStep> = {
 			{
 				method: "POST";
 				body: InferStepInput<K>;
+				use: [typeof sessionMiddleware],
 			},
 			OnboardingStepReturnType<K>
 		>
@@ -40,6 +41,7 @@ export type EndpointPair<Path extends string, K extends OnboardingStep> = {
 			`/onboarding/can-access-step/${TransformClientPath<Path>}`,
 			{
 				method: "GET";
+				use: [typeof sessionMiddleware],
 				metadata: {
 					SERVER_ONLY: true;
 				};
