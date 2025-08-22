@@ -190,9 +190,15 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 					},
 					handler: createAuthMiddleware(async (ctx) => {
 						const data = ctx.context.newSession;
-						if (!data) {
-							return null;
+						const enabled =
+							typeof opts.autoEnableOnSignUp === "function"
+								? await opts.autoEnableOnSignUp(ctx)
+								: opts.autoEnableOnSignUp;
+
+						if (!data || !enabled) {
+							return;
 						}
+
 						await ctx.context.adapter.update({
 							model: "user",
 							where: [

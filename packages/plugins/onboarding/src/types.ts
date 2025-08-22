@@ -23,7 +23,9 @@ export type OnboardingOptions<
 	 * Whether to automatically enable onboarding for new users during sign up
 	 * @default true
 	 */
-	autoEnableOnSignUp?: boolean;
+	autoEnableOnSignUp?:
+		| boolean
+		| ((ctx: GenericEndpointContext) => boolean | Promise<boolean>);
 	/**
 	 * Custom schema configuration for the onboarding plugin
 	 */

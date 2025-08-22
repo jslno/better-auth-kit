@@ -178,6 +178,46 @@ describe("Onboarding", () => {
 			await signUpWithTestUser();
 			expect(mockOnboardingRedirect).not.toHaveBeenCalled();
 		});
+
+		it("should trigger redirect when autoEnableOnSignUp is a function returning true", async () => {
+			mockOnboardingRedirect.mockClear();
+			const { signUpWithTestUser } = await getTestInstance(
+				getAuth({
+					autoEnableOnSignUp: () => true,
+				}),
+				{
+					clientOptions: {
+						plugins: [
+							onboardingClient({
+								onOnboardingRedirect: mockOnboardingRedirect,
+							}),
+						],
+					},
+				},
+			);
+			await signUpWithTestUser();
+			expect(mockOnboardingRedirect).toHaveBeenCalled();
+		});
+
+		it("should not trigger redirect when autoEnableOnSignUp is an async function returning false", async () => {
+			mockOnboardingRedirect.mockClear();
+			const { signUpWithTestUser } = await getTestInstance(
+				getAuth({
+					autoEnableOnSignUp: async () => false,
+				}),
+				{
+					clientOptions: {
+						plugins: [
+							onboardingClient({
+								onOnboardingRedirect: mockOnboardingRedirect,
+							}),
+						],
+					},
+				},
+			);
+			await signUpWithTestUser();
+			expect(mockOnboardingRedirect).not.toHaveBeenCalled();
+		});
 	});
 });
 
