@@ -58,3 +58,12 @@ type KebabCont<S extends string> = S extends `${infer F}${infer R}`
 	: S;
 
 export type TransformClientPath<S extends string> = KebabStart<S>;
+
+export const toPath = (u?: string | URL) => {
+	if (!u) return "";
+	try {
+		return new URL(u).pathname;
+	} catch {
+		return `${u}`;
+	}
+};

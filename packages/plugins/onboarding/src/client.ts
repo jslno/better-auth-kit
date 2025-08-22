@@ -1,5 +1,6 @@
 import type { BetterAuthClientPlugin } from "better-auth";
 import type { onboarding, OnboardingStep } from ".";
+import { toPath } from "./utils";
 
 type InferSteps<T> = T extends {
 	$Infer: {
@@ -49,14 +50,14 @@ export const onboardingClient = <
 						}
 					},
 					async onRequest(context) {
-						if (
-							!new URL(context.url).pathname.startsWith(
-								`${new URL(context.baseURL ?? "/api/auth").pathname}/onboarding/step`,
-							)
-						) {
+						const urlPath = toPath(context.url);
+						const basePathRaw = toPath(context.baseURL ?? "/api/auth");
+						const basePath = basePathRaw.endsWith("/")
+							? basePathRaw.slice(0, -1)
+							: basePathRaw;
+						if (!urlPath.startsWith(`${basePath}/onboarding/step/`)) {
 							return;
 						}
-
 						return {
 							...context,
 							method: "POST",
