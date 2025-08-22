@@ -5,6 +5,12 @@ export const schema = {
 		fields: {
 			shouldOnboard: {
 				type: "boolean",
+				required: false,
+			},
+			completedSteps: {
+				type: "string[]",
+				required: false,
+				input: false,
 			},
 		},
 	},
