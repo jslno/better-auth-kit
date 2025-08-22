@@ -45,21 +45,23 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 					async (ctx): Promise<OnboardingStepReturnType<typeof step>> => {
 						const { session } = await verifyOnboarding(ctx);
 
-						const completedSteps = new Set(
-							(
-								(await ctx.context.adapter.findOne<{
-									completedSteps?: string[];
-								}>({
-									model: "user",
-									where: [
-										{
-											field: "id",
-											value: session.user.id,
-										},
-									],
-									select: ["completedSteps"],
-								})) ?? {}
-							).completedSteps,
+						const completedSteps = new Set<string>(
+							JSON.parse(
+								(
+									await ctx.context.adapter.findOne<{
+										completedSteps?: string;
+									}>({
+										model: "user",
+										where: [
+											{
+												field: "id",
+												value: session.user.id,
+											},
+										],
+										select: ["completedSteps"],
+									})
+								)?.completedSteps ?? "[]",
+							),
 						);
 
 						if (step.once && completedSteps.has(id)) {
@@ -70,8 +72,9 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 
 						const result = await step.handler(ctx);
 
+						const updatedSteps = [...completedSteps.add(id)];
 						const update: Record<string, any> = {
-							completedSteps: [...completedSteps.add(id)],
+							completedSteps: JSON.stringify(updatedSteps),
 						};
 
 						if (isCompletionStep) {
@@ -90,7 +93,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 						});
 
 						return {
-							completedSteps: update.completedSteps,
+							completedSteps: updatedSteps,
 							data: result,
 						};
 					},

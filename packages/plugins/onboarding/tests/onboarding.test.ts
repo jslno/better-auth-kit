@@ -37,6 +37,7 @@ describe("Onboarding", () => {
 				],
 				update: {
 					shouldOnboard: true,
+					completedSteps: "[]",
 				},
 			});
 		});

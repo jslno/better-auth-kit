@@ -8,7 +8,7 @@ export const schema = {
 				required: false,
 			},
 			completedSteps: {
-				type: "string[]",
+				type: "string",
 				required: false,
 				input: false,
 			},
