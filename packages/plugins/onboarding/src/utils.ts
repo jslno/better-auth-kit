@@ -7,9 +7,7 @@ export function transformPath<T extends LiteralString>(
 		.split(/[-/]/g)
 		.map((segment, index) => {
 			if (segment.length === 0) return ""; // handle leading separators
-			return index === 0
-				? segment.charAt(0).toUpperCase() + segment.slice(1)
-				: segment.charAt(0).toUpperCase() + segment.slice(1);
+			return segment.charAt(0).toUpperCase() + segment.slice(1);
 		})
 		.join("");
 
@@ -41,13 +39,15 @@ export function transformClientPath<T extends LiteralString>(
 	return result as TransformClientPath<T>;
 }
 
-type KebabStart<S extends string> = S extends `-${infer R}` | `/${infer F}`
-	? KebabStart<R & F>
-	: S extends `${infer F}${infer R}`
-		? F extends Lowercase<F>
-			? `${F}${KebabCont<R>}`
-			: `${Lowercase<F>}${KebabCont<R>}`
-		: S;
+type KebabStart<S extends string> = S extends `-${infer R}`
+	? KebabStart<R>
+	: S extends `/${infer R}`
+		? KebabStart<R>
+		: S extends `${infer F}${infer R}`
+			? F extends Lowercase<F>
+				? `${F}${KebabCont<R>}`
+				: `${Lowercase<F>}${KebabCont<R>}`
+			: S;
 
 type KebabCont<S extends string> = S extends `${infer F}${infer R}`
 	? F extends "-" | "/"

@@ -11,11 +11,17 @@ type ActionEndpointContext<Schema = unknown, Result = unknown> = (
 export type OnboardingOptions<
 	Steps extends Record<string, OnboardingStep> = any,
 > = {
+	/**
+	 * Map of onboarding steps keyed by a unique step identifier.
+	 */
 	steps: Steps;
+	/**
+	 * The key of the step that, when completed, marks onboarding as finished.
+	 */
 	completionStep: keyof Steps;
 	/**
 	 * Whether to automatically enable onboarding for new users during sign up
-	 * @default false
+	 * @default true
 	 */
 	autoEnableOnSignUp?: boolean;
 	/**

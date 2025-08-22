@@ -6,8 +6,8 @@ import type { TransformClientPath, TransformPath } from "./utils";
 type InferStepInput<K extends OnboardingStep> = K extends { input?: infer I }
 	? I extends ZodSchema<any>
 		? I
-		: never
-	: never;
+		: undefined
+	: undefined;
 
 type InferStepResult<K extends OnboardingStep> = K extends OnboardingStep<
 	any,
@@ -31,7 +31,7 @@ export type EndpointPair<Path extends string, K extends OnboardingStep> = {
 			{
 				method: "POST";
 				body: InferStepInput<K>;
-				use: [typeof sessionMiddleware],
+				use: [typeof sessionMiddleware];
 			},
 			OnboardingStepReturnType<K>
 		>
@@ -41,7 +41,7 @@ export type EndpointPair<Path extends string, K extends OnboardingStep> = {
 			`/onboarding/can-access-step/${TransformClientPath<Path>}`,
 			{
 				method: "GET";
-				use: [typeof sessionMiddleware],
+				use: [typeof sessionMiddleware];
 				metadata: {
 					SERVER_ONLY: true;
 				};
