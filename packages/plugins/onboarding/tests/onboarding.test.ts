@@ -7,8 +7,9 @@ import { getAuth } from "./auth";
 const mockOnboardingRedirect = vi.fn();
 describe("Onboarding", () => {
 	describe("(success)", async () => {
+		const auth = getAuth();
 		const { resetDatabase, client, signUpWithTestUser, testUser, db } =
-			await getTestInstance(getAuth(), {
+			await getTestInstance(auth, {
 				clientOptions: {
 					plugins: [
 						onboardingClient({
@@ -61,35 +62,21 @@ describe("Onboarding", () => {
 			expect(mockOnboardingRedirect).toHaveBeenCalled();
 		});
 
-		it("should complete onboarding successfully and return sanitized user", async () => {
-			const res = await client.onboarding.complete({
+		it("should complete onboarding step successfully and return true", async () => {
+			const res = await (client.onboarding as any).step.newPassword({
 				foo: "bar",
 				fetchOptions: {
 					headers,
 				},
 			});
 			if (res.error) throw res.error;
-			await expect(
-				db.findOne<{ shouldOnboard?: boolean }>({
-					model: "user",
-					where: [
-						{
-							field: "email",
-							value: testUser.email,
-						},
-					],
-					select: ["shouldOnboard"],
-				}),
-			).resolves.toEqual({
-				shouldOnboard: false,
-			});
-			expect(res.data?.user.id).toBeDefined();
-			expect(res.data?.user.email).toBeDefined();
+			expect(res.data.completedSteps).toEqual(["newPassword"]);
+			expect(res.data.data).toBe(true);
 		});
 
 		it("should not trigger redirect via getSession after completing onboarding", async () => {
 			mockOnboardingRedirect.mockClear();
-			await client.onboarding.complete({
+			await (client as any).onboarding.step.newPassword({
 				fetchOptions: {
 					headers,
 				},
@@ -103,8 +90,8 @@ describe("Onboarding", () => {
 			expect(mockOnboardingRedirect).not.toHaveBeenCalled();
 		});
 
-		it("should return unauthorized on shouldOnboard when already onboarded", async () => {
-			await client.onboarding.complete({
+		it("should return forbidden on shouldOnboard when already onboarded", async () => {
+			await (client.onboarding as any).step.newPassword({
 				fetchOptions: {
 					headers,
 				},
@@ -114,7 +101,7 @@ describe("Onboarding", () => {
 					headers,
 				},
 			});
-			expect(error?.status).toBe(401);
+			expect(error?.status).toBe(403);
 			expect(error?.message).toBe(ONBOARDING_ERROR_CODES.ALREADY_ONBOARDED);
 		});
 
@@ -122,8 +109,9 @@ describe("Onboarding", () => {
 			const { error } = await client.onboarding.shouldOnboard();
 			expect(error?.status).toBe(401);
 		});
+
 		it("should fail onboarding without session", async () => {
-			const res = await client.onboarding.complete({
+			const res = await (client.onboarding as any).step.newPassword({
 				fetchOptions: {
 					headers: new Headers(),
 				},
@@ -131,87 +119,18 @@ describe("Onboarding", () => {
 			expect(res.error?.status).toBe(401);
 		});
 
-		it("should error when already onboarded", async () => {
-			await db.update({
-				model: "user",
-				where: [
-					{
-						field: "email",
-						value: testUser.email,
-					},
-				],
-				update: {
-					shouldOnboard: false,
-				},
-			});
-			const res = await client.onboarding.complete({
+		it("should error when completing the same step twice if once is true", async () => {
+			await (client.onboarding as any).step.newPassword({
 				fetchOptions: {
 					headers,
 				},
 			});
-			expect(res.error?.message).toBe(ONBOARDING_ERROR_CODES.ALREADY_ONBOARDED);
-		});
-	});
-
-	describe("(failure)", async () => {
-		const { resetDatabase, client, signUpWithTestUser, testUser, db } =
-			await getTestInstance(
-				getAuth({
-					autoEnableOnSignUp: true,
-					async onComplete(ctx) {
-						return false;
-					},
-				}),
-				{
-					clientOptions: {
-						plugins: [
-							onboardingClient({
-								onOnboardingRedirect: mockOnboardingRedirect,
-							}),
-						],
-					},
-				},
-			);
-
-		let headers: Headers;
-		beforeAll(async () => {
-			await resetDatabase();
-			const result = await signUpWithTestUser();
-			headers = result.headers;
-		});
-
-		it("should reject onboarding when onComplete returns false", async () => {
-			await db.update({
-				model: "user",
-				where: [
-					{
-						field: "email",
-						value: testUser.email,
-					},
-				],
-				update: {
-					shouldOnboard: true,
-				},
-			});
-			const result = await client.onboarding.complete({
+			const res = await (client.onboarding as any).step.newPassword({
 				fetchOptions: {
 					headers,
 				},
 			});
-
-			expect(result.error?.message).toBe(
-				ONBOARDING_ERROR_CODES.FAILED_TO_COMPLETE_ONBOARDING,
-			);
-		});
-
-		it("should reject onboarding with invalid schema body", async () => {
-			const res = await client.onboarding.complete({
-				foo: 123,
-				fetchOptions: {
-					headers,
-				},
-			});
-			expect(res.error?.status).toBe(400);
+			expect(res.error?.status).toBe(403);
 		});
 	});
 

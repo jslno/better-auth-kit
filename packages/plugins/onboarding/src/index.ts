@@ -1,25 +1,132 @@
-import type { OnboardingOptions } from "./types";
-import type { BetterAuthPlugin } from "better-auth";
+import {
+	betterAuth,
+	type BetterAuthPlugin,
+	type PrettifyDeep,
+} from "better-auth";
 import { mergeSchema } from "better-auth/db";
 import { schema } from "./schema";
 import { ONBOARDING_ERROR_CODES } from "./error-codes";
-import { createAuthMiddleware } from "better-auth/api";
+import {
+	createAuthEndpoint,
+	createAuthMiddleware,
+	APIError,
+} from "better-auth/api";
 import { shouldOnboard } from "./routes/should-onboard";
 import { completeOnboarding } from "./routes/complete-onboard";
+import type { OnboardingOptions, OnboardingStep } from "./types";
+import type {
+	CanAccessOnboardingStepReturnType,
+	Merged,
+	OnboardingStepReturnType,
+	OnboardingStepsToEndpoints,
+} from "./internal-types";
+import { transformClientPath, transformPath } from "./utils";
+import { verifyOnboarding } from "./verify-onboarding";
+import { z } from "zod";
 
-export const onboarding = <Schema extends Record<string, any>>(
-	options: OnboardingOptions<Schema>,
+export const onboarding = <Steps extends Record<string, OnboardingStep>>(
+	options: OnboardingOptions<Steps>,
 ) => {
 	const opts = {
 		autoEnableOnSignUp: true,
 		...options,
 	};
 
+	const endpoints = Object.fromEntries(
+		Object.entries(options.steps).flatMap(([id, step]) => {
+			const isCompletionStep = options.completionStep === id;
+			const key = transformPath(id);
+			const path = transformClientPath(id);
+
+			const entries = Object.entries({
+				[`onboardingStep${key}`]: createAuthEndpoint(
+					`/onboarding/step/${path}`,
+					{
+						method: "POST",
+						body: step.input,
+					},
+					async (ctx): Promise<OnboardingStepReturnType<typeof step>> => {
+						const { session } = await verifyOnboarding(ctx);
+
+						const completedSteps = new Set(
+							(
+								(await ctx.context.adapter.findOne<{
+									completedSteps?: string[];
+								}>({
+									model: "user",
+									where: [
+										{
+											field: "id",
+											value: session.user.id,
+										},
+									],
+									select: ["completedSteps"],
+								})) ?? {}
+							).completedSteps,
+						);
+
+						if (step.once && completedSteps.has(id)) {
+							throw new APIError("FORBIDDEN", {
+								message: "Already completed this step",
+							});
+						}
+
+						const result = await step.handler(ctx);
+
+						const update: Record<string, any> = {
+							completedSteps: [...completedSteps.add(id)],
+						};
+
+						if (isCompletionStep) {
+							update.shouldOnboard = false;
+						}
+
+						await ctx.context.adapter.update({
+							model: "user",
+							where: [
+								{
+									field: "id",
+									value: session.user.id,
+								},
+							],
+							update,
+						});
+
+						return {
+							completedSteps: update.completedSteps,
+							data: result,
+						};
+					},
+				),
+				[`canAccessOnboardingStep${key}`]: createAuthEndpoint(
+					`/onboarding/can-access-step/${path}`,
+					{
+						method: "GET",
+						metadata: {
+							SERVER_ONLY: true,
+						},
+					},
+					async (
+						ctx,
+					): Promise<CanAccessOnboardingStepReturnType<typeof step>> => {
+						if (step.once) {
+						}
+
+						return true;
+					},
+				),
+			});
+
+			return entries;
+		}),
+	) as PrettifyDeep<Merged<OnboardingStepsToEndpoints<Steps>>>;
+
 	return {
 		id: "onboarding",
 		endpoints: {
 			shouldOnboard,
 			completeOnboarding: completeOnboarding(opts),
+			...endpoints,
 		},
 		hooks: {
 			after: [
@@ -82,9 +189,22 @@ export const onboarding = <Schema extends Record<string, any>>(
 		schema: mergeSchema(schema, opts?.schema),
 		$ERROR_CODES: ONBOARDING_ERROR_CODES,
 		$Infer: {
-			OnboardingInput: {} as Schema,
+			OnboardingSteps: {} as Steps,
 		},
 	} satisfies BetterAuthPlugin;
+};
+
+export const createOnboardingStep = <
+	Schema extends Record<string, any> | undefined | null,
+	Result = unknown,
+>(
+	def: OnboardingStep<Schema, Result>,
+) => {
+	return {
+		once: true,
+		input: z.record(z.any()).nullish(),
+		...def,
+	};
 };
 
 export * from "./types";

@@ -10,7 +10,7 @@ export async function verifyOnboarding(ctx: GenericEndpointContext) {
 	}
 
 	if (!session.user.shouldOnboard) {
-		throw new APIError("UNAUTHORIZED", {
+		throw new APIError("FORBIDDEN", {
 			message: ONBOARDING_ERROR_CODES.ALREADY_ONBOARDED,
 		});
 	}
@@ -18,19 +18,5 @@ export async function verifyOnboarding(ctx: GenericEndpointContext) {
 	return {
 		session,
 		key: `${session.user.id}!${session.session.id}`,
-		valid: async (ctx: GenericEndpointContext) => {
-			return ctx.json({
-				user: {
-					id: session.user.id,
-					email: session.user.email,
-					emailVerified: session.user.emailVerified,
-					firstName: session.user.firstName,
-					name: session.user.name,
-					image: session.user.image,
-					createdAt: session.user.createdAt,
-					updatedAt: session.user.updatedAt,
-				},
-			});
-		},
 	};
 }

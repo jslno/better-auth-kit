@@ -1,22 +1,25 @@
 import type { BetterAuthClientPlugin, BetterAuthPlugin } from "better-auth";
-import type { onboarding } from ".";
-import type { ZodSchema } from "zod";
+import type { onboarding, OnboardingStep } from ".";
 
-type InferSchema<T> = T extends {
+type InferSteps<T> = T extends {
 	$Infer: {
-		OnboardingInput: infer Schema extends Record<string, any>;
+		OnboardingSteps: infer Steps extends Record<string, OnboardingStep>;
 	};
 }
-	? Schema
-	: T extends Record<string, any>
+	? Steps
+	: T extends Record<string, OnboardingStep>
 		? T
 		: never;
 
-export const onboardingClient = <Schema extends Record<string, any>>(options?: {
-	/**
-	 * Zod schema for validating the onboarding input data
-	 */
-	input?: ZodSchema<InferSchema<Schema>>;
+export const onboardingClient = <
+	Steps extends
+		| {
+				$Infer: {
+					OnboardingSteps: Record<string, OnboardingStep>;
+				};
+		  }
+		| Record<string, OnboardingStep>,
+>(options?: {
 	/**
 	 * a redirect function to call if a user needs
 	 * to be onboarded
@@ -25,19 +28,14 @@ export const onboardingClient = <Schema extends Record<string, any>>(options?: {
 }) => {
 	return {
 		id: "onboarding",
-		$InferServerPlugin: {} as ReturnType<
-			typeof onboarding<InferSchema<Schema>>
-		>,
+		$InferServerPlugin: {} as ReturnType<typeof onboarding<InferSteps<Steps>>>,
 		atomListeners: [
 			{
 				matcher: (path) => path.startsWith("/onboarding/"),
 				signal: "$sessionSignal",
 			},
 		],
-		pathMethods: {
-			"/onboarding/complete": "POST",
-			"/onboarding/should-onboard": "GET",
-		},
+
 		fetchPlugins: [
 			{
 				id: "onboarding",
@@ -49,6 +47,20 @@ export const onboardingClient = <Schema extends Record<string, any>>(options?: {
 								await options.onOnboardingRedirect();
 							}
 						}
+					},
+					async onRequest(context) {
+						if (
+							!new URL(context.url).pathname.startsWith(
+								`${new URL(context.baseURL ?? "/api/auth").pathname}/onboarding/step`,
+							)
+						) {
+							return;
+						}
+
+						return {
+							...context,
+							method: "POST",
+						};
 					},
 				},
 			},
