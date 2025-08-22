@@ -107,7 +107,28 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 					async (
 						ctx,
 					): Promise<CanAccessOnboardingStepReturnType<typeof step>> => {
+						const { session } = await verifyOnboarding(ctx);
+
 						if (step.once) {
+							const { completedSteps } =
+								(await ctx.context.adapter.findOne<{
+									completedSteps?: string[];
+								}>({
+									model: "user",
+									where: [
+										{
+											field: "id",
+											value: session.user.id,
+										},
+									],
+									select: ["completedSteps"],
+								})) ?? {};
+
+							if (completedSteps?.includes(id)) {
+								throw new APIError("FORBIDDEN", {
+									message: ONBOARDING_ERROR_CODES.STEP_ALREADY_COMPLETED,
+								});
+							}
 						}
 
 						return true;
