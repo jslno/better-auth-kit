@@ -17,6 +17,7 @@ describe("Onboarding", () => {
 						}),
 					],
 				},
+				shouldRunMigrations: true,
 			});
 
 		let headers: Headers;
@@ -146,6 +147,7 @@ describe("Onboarding", () => {
 						}),
 					],
 				},
+				shouldRunMigrations: true,
 			},
 		);
 
@@ -173,6 +175,7 @@ describe("Onboarding", () => {
 							}),
 						],
 					},
+					shouldRunMigrations: true,
 				},
 			);
 			await signUpWithTestUser();
@@ -193,6 +196,7 @@ describe("Onboarding", () => {
 							}),
 						],
 					},
+					shouldRunMigrations: true,
 				},
 			);
 			await signUpWithTestUser();
@@ -213,6 +217,7 @@ describe("Onboarding", () => {
 							}),
 						],
 					},
+					shouldRunMigrations: true,
 				},
 			);
 			await signUpWithTestUser();
@@ -243,6 +248,7 @@ describe("Onboarding", () => {
 						}),
 					],
 				},
+				shouldRunMigrations: true,
 			});
 
 		let headers: Headers;

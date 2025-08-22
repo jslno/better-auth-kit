@@ -1,4 +1,8 @@
-import type { GenericEndpointContext, InferOptionSchema } from "better-auth";
+import type {
+	AuthContext,
+	GenericEndpointContext,
+	InferOptionSchema,
+} from "better-auth";
 import type { ZodSchema } from "zod";
 import type { schema } from "./schema";
 
@@ -56,4 +60,16 @@ export type OnboardingStep<
 	 * If true, this step must be completed before onboarding is considered done.
 	 */
 	required?: boolean;
+	/**
+     * If true headers will be required to be passed in the context
+     */
+    requireHeaders?: boolean;
+    /**
+     * If true request object will be required
+     */
+    requireRequest?: boolean;
+    /**
+     * Clone the request object from the router
+     */
+    cloneRequest?: boolean;
 };

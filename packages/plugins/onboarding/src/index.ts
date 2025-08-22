@@ -1,4 +1,4 @@
-import type { BetterAuthPlugin, PrettifyDeep } from "better-auth";
+import type { AuthContext, BetterAuthPlugin, PrettifyDeep } from "better-auth";
 import { mergeSchema } from "better-auth/db";
 import { schema } from "./schema";
 import { ONBOARDING_ERROR_CODES } from "./error-codes";
@@ -44,6 +44,9 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 						method: "POST",
 						body: step.input,
 						use: [sessionMiddleware],
+						requireHeaders: step.requireHeaders,
+						requireRequest: step.requireRequest,
+						cloneRequest: step.cloneRequest,
 					},
 					async (ctx): Promise<OnboardingStepReturnType<typeof step>> => {
 						const { session } = await verifyOnboarding(ctx);

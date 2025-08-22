@@ -3,20 +3,24 @@ import {
 	type OnboardingOptions,
 	createOnboardingStep,
 } from "../src";
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import database from "better-sqlite3";
 import { z } from "zod";
 
-const db = database("test.db");
 const onboardingSchema = z
 	.object({
 		foo: z.string().optional(),
 	})
 	.nullish();
 
-export const getAuth = (options?: Partial<OnboardingOptions>) => {
+export const getAuth = (
+	options?: Partial<OnboardingOptions>,
+	authOptions?: {
+		plugins?: BetterAuthPlugin[];
+	},
+) => {
 	const auth = betterAuth({
-		database: db,
+		database: database(":memory:"),
 		emailAndPassword: {
 			enabled: true,
 		},
@@ -33,6 +37,7 @@ export const getAuth = (options?: Partial<OnboardingOptions>) => {
 				completionStep: "newPassword",
 				...options,
 			}),
+			...(authOptions?.plugins ?? []),
 		],
 	});
 
