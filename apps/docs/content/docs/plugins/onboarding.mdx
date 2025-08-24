@@ -1,0 +1,403 @@
+---
+title: Onboarding
+description: Easily add onboarding to your authentication flow.
+---
+
+<StatsBadge npmPackage="@better-auth-kit/onboarding" />
+<GithubButton url="https://github.com/ping-maxwell/better-auth-kit/tree/main/packages/plugins/onboarding" />
+<NpmButton url="https://www.npmjs.com/package/@better-auth-kit/onboarding" />
+
+The Onboarding plugin allows you to create multi-step onboarding flows for new users. It automatically tracks completion status, enforces step requirements, and integrates seamlessly with your authentication flow.
+
+## Features
+
+- **Multi-step onboarding flows** with custom validation
+- **Automatic completion tracking** per user
+- **Required step enforcement** before marking onboarding complete
+- **One-time step protection** to prevent duplicate completions
+- **Built-in presets** for common onboarding scenarios
+- **Client-side integration** with automatic redirects
+
+## Installation
+
+<Steps>
+  <Step>
+    ### Install the plugin
+
+    ```package-install
+    @better-auth-kit/onboarding
+    ```
+
+  </Step>
+
+  <Step>
+    ### Add the plugin to your auth config
+
+    To use the Onboarding plugin, add it to your auth config.
+
+    ```ts title="auth.ts"
+    import { betterAuth } from "better-auth";
+    import { onboarding, createOnboardingStep } from "@better-auth-kit/onboarding";
+    import { z } from "zod";
+
+    export const auth = betterAuth({
+      plugins: [
+        onboarding({
+          steps: {
+            profile: createOnboardingStep({
+              input: z.object({
+                firstName: z.string().min(1),
+                lastName: z.string().min(1),
+                bio: z.string().optional(),
+              }),
+              async handler(ctx) {
+                // Update user profile
+                return { success: true };
+              },
+              required: true,
+            }),
+            preferences: createOnboardingStep({
+              input: z.object({
+                theme: z.enum(["light", "dark", "auto"]),
+                notifications: z.boolean(),
+              }),
+              async handler(ctx) {
+                // Save user preferences
+                return { success: true };
+              },
+            }),
+          },
+          completionStep: "preferences",
+        }),
+      ],
+    });
+    ```
+
+  </Step>
+
+  <Step>
+    ### Add the client plugin
+
+    Include the client plugin in your auth client instance.
+
+    ```ts title="auth-client.ts"
+    import { createAuthClient } from "better-auth/client";
+    import { onboardingClient } from "@better-auth-kit/onboarding/client";
+    import type { auth } from "./your/path"; // Import as type
+
+    const authClient = createAuthClient({
+      plugins: [
+        onboardingClient<typeof auth>({
+          onOnboardingRedirect: () => {
+            window.location.href = "/onboarding";
+          },
+        }),
+      ],
+    });
+    ```
+
+  </Step>
+
+  <Step>
+    ### Run migrations
+
+    This plugin adds additional fields to the user table. [Click here to see the schema](#schema)
+    
+    <Tabs items={["migrate", "generate"]}>
+      <Tab value="migrate">
+        ```package-install
+        npx @better-auth/cli migrate
+        ```
+      </Tab>
+      <Tab value="generate">
+        ```package-install
+        npx @better-auth/cli generate
+        ```
+      </Tab>
+    </Tabs>
+
+    <span className='text-sm text-muted-foreground'>Learn more about the migrate/generate commands [here](https://www.better-auth.com/docs/concepts/cli#generate).</span>
+
+  </Step>
+</Steps>
+
+## Usage
+
+The Onboarding plugin provides several endpoints to manage the onboarding flow. Users can check if they need onboarding, complete steps, and verify their progress.
+
+### Check if User Needs Onboarding
+
+Use the `shouldOnboard` function to check if a user needs to complete onboarding.
+
+```ts title="client"
+// Check if user needs onboarding
+const { data: needsOnboarding } = await authClient.onboarding.shouldOnboard();
+
+if (needsOnboarding) {
+  // Redirect to onboarding flow
+  router.push("/onboarding");
+}
+```
+
+```ts title="server"
+// Check if user needs onboarding
+const needsOnboarding = await auth.api.shouldOnboard();
+
+if (needsOnboarding) {
+  // Redirect to onboarding flow
+  redirect("/onboarding");
+}
+```
+
+### Complete Onboarding Step
+
+Use the `onboardingStep` function to complete a specific onboarding step. The step name is derived from your step configuration.
+
+```ts title="client"
+// Complete profile step
+const { data, error } = await authClient.onboarding.step.profile({
+  firstName: "John",
+  lastName: "Doe",
+  bio: "Software developer",
+});
+
+if (error) {
+  console.error("Failed to complete profile step:", error);
+} else {
+  console.log("Completed steps:", data.completedSteps);
+}
+
+const success = data.data.success;
+```
+
+```ts title="server"
+// Complete profile step
+const data = await auth.api.onboardingStepProfile({
+  body: {
+    firstName: "John",
+    lastName: "Doe",
+    bio: "Software developer",
+  }
+});
+
+const success = data.success;
+```
+
+### Check Step Access
+
+Use the `canAccessOnboardingStep` function to check if a user can access a specific step. This is useful for preventing access to steps that shouldn't be available.
+
+```ts title="server"
+// Check if user can access preferences step
+const canAccess = await auth.api.canAccessOnboardingStepPreferences();
+```
+
+### Skip Completion Step
+
+For optional completion steps, users can skip them if they're not required. This is useful when the completion step is optional but you still want to mark onboarding as complete.
+
+```ts title="client"
+// Skip the completion step (only available for non-required completion steps)
+const { data, error } = await authClient.onboarding.skipStep.preferences();
+```
+
+```ts title="server"
+// Skip the completion step (only available for non-required completion steps)
+const data = await auth.api.skipOnboardingStepPreferences();
+```
+
+### Handle Onboarding Redirects
+
+The plugin automatically handles onboarding redirects when users sign up or get their session. Configure the redirect behavior in the client plugin.
+
+```ts title="auth-client.ts"
+onboardingClient<typeof auth>({
+  onOnboardingRedirect: () => {
+    // Custom redirect logic
+    window.location.href = "/onboarding";
+  },
+})
+```
+
+## Defining Steps
+
+Steps are defined using the `createOnboardingStep` function. Each step requires a handler function and can include input validation and completion rules.
+
+```ts
+import { createOnboardingStep } from "@better-auth-kit/onboarding";
+
+const step = createOnboardingStep({
+  async handler(ctx) {
+    // process step
+  },
+  // other configuration
+});
+```
+
+### Options
+
+- **input**: `ZodSchema` - Zod schema for request body validation
+- **handler**: `<R>(ctx: GenericEndpointContext) => R | Promise<R>` - Function that processes the step
+- **once**: `boolean` - If `true`, step can only be completed once (default: `true`)
+- **required**: `boolean` - If `true`, step must be completed before onboarding is done
+- **requireHeader**: `boolean` - If `true`, headers are required in context
+- **requireRequest**: `boolean` - If `true`, request object is required
+- **cloneRequest**: `boolean` - Clone the request object from router
+
+### Example
+
+```ts
+import { createOnboardingStep } from "@better-auth-kit/onboarding";
+
+const profileStep = createOnboardingStep({
+  input: z.object({
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+  }),
+  async handler(ctx) {
+    const { firstName, lastName } = ctx.body;
+    
+    await ctx.context.internalAdapter.updateUser(ctx.context.session!.user.id, {
+      firstName,
+      name: lastName,
+    });
+    
+    return { success: true };
+  },
+  required: true,
+});
+```
+
+## Presets
+
+### Setup New Password
+
+```ts
+import { setupNewPasswordStep } from "@better-auth-kit/onboarding/presets";
+
+onboarding({
+  steps: {
+    newPassword: setupNewPasswordStep({
+      required: true,
+      passwordSchema: {
+        minLength: 12,
+        maxLength: 128,
+      },
+    }),
+  },
+  completionStep: "newPassword",
+});
+```
+
+### Setup 2FA
+
+```ts
+import { setup2FAStep } from "@better-auth-kit/onboarding/presets";
+
+onboarding({
+  steps: {
+    twoFactor: setup2FAStep({
+      required: true,
+    }),
+  },
+  completionStep: "twoFactor",
+});
+```
+
+## Schema
+
+The plugin adds additional fields to the `user` table.
+
+<SchemaDemo plugin="onboarding" includeDefaultUser schema={{
+  user: {
+    fields: {
+      shouldOnboard: {
+        type: "boolean",
+        required: false,
+      },
+      completedSteps: {
+        type: "string",
+        required: false,
+        input: false,
+      },
+    }
+  }
+}} />
+
+Fields:
+
+- `shouldOnboard`: Whether the user needs to complete onboarding
+- `completedSteps`: JSON string array of completed step IDs
+
+## Options
+
+**steps**: `Record<string, OnboardingStep>` - Object mapping step IDs to step configurations. Each step defines the input validation, handler function, and completion rules.
+
+**completionStep**: `keyof Steps` - The step ID that marks onboarding as complete. Once this step is completed, the user's `shouldOnboard` field is set to `false`.
+
+**autoEnableOnSignUp**: `boolean | ((ctx: GenericEndpointContext) => boolean | Promise<boolean>)` - Whether to automatically enable onboarding for new users during sign up. (default: `true`).
+
+**secondaryStorage**: `boolean` - Whether to use secondary storage instead of the database. (default: `false`).
+
+**schema**: `InferOptionSchema<typeof schema>` - Custom schema configuration for renaming fields or adding additional configuration.
+
+## Best Practices
+
+### 1. Progressive Disclosure
+
+Break down onboarding into logical, digestible steps:
+
+```ts
+const steps = {
+  welcome: createOnboardingStep({ /* welcome step */ }),
+  profile: createOnboardingStep({ /* basic profile */ }),
+  preferences: createOnboardingStep({ /* user preferences */ }),
+  verification: createOnboardingStep({ /* email/phone verification */ }),
+};
+```
+
+### 2. Required vs Optional Steps
+
+Use the `required` flag to distinguish between essential and optional steps:
+
+```ts
+const steps = {
+  terms: createOnboardingStep({ required: true }),     // Must complete
+  profile: createOnboardingStep({ required: true }),   // Must complete
+  preferences: createOnboardingStep({ required: false }), // Optional
+};
+```
+
+### 3. Input Validation
+
+Always validate user input with Zod schemas:
+
+```ts
+createOnboardingStep({
+  input: z.object({
+    email: z.string().email("Invalid email address"),
+    phone: z.string().regex(/^\+?[\d\s-()]+$/, "Invalid phone number"),
+  }).refine(data => data.email || data.phone, {
+    message: "Either email or phone is required",
+    path: ["email"],
+  }),
+  async handler(ctx) {
+    // ...
+  },
+});
+```
+
+### 4. Secondary Storage
+
+Use secondary storage instead of the main database.
+
+```ts
+onboarding({
+  secondaryStorage: true,
+  // ...
+});
+```
+
+## Shoutout
+
+This plugin was built by <GithubUser>jslno</GithubUser>! ❤️

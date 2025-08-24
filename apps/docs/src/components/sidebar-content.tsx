@@ -22,6 +22,7 @@ import {
 	Book,
 	User,
 	UserPlus,
+	DoorOpen
 } from "lucide-react";
 import type { Content } from "./sidebar";
 
@@ -72,6 +73,11 @@ export const contents: Content[] = [
 				href: "/docs/plugins/app-invite",
 				title: "App Invite",
 				icon: () => <UserPlus size={16} />,
+			},
+			{
+				href: "/docs/plugins/onboarding",
+				title: "Onboarding",
+				icon: () => <DoorOpen size={16} />,
 			},
 			{
 				href: "/docs/plugins/blockade",
