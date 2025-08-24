@@ -32,6 +32,12 @@ export type OnboardingOptions<
 		| boolean
 		| ((ctx: GenericEndpointContext) => boolean | Promise<boolean>);
 	/**
+	 * Whether to use secondary storage instead of database.
+	 *
+	 * @default false
+	 */
+	secondaryStorage?: boolean;
+	/**
 	 * Custom schema configuration for the onboarding plugin
 	 */
 	schema?: InferOptionSchema<typeof schema>;

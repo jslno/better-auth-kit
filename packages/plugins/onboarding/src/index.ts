@@ -9,7 +9,6 @@ import {
 	sessionMiddleware,
 	type AuthEndpoint,
 } from "better-auth/api";
-import { shouldOnboard } from "./routes/should-onboard";
 import type { OnboardingOptions, OnboardingStep } from "./types";
 import type {
 	CanAccessOnboardingStepReturnType,
@@ -21,6 +20,7 @@ import type {
 } from "./internal-types";
 import { transformClientPath, transformPath } from "./utils";
 import { verifyOnboarding } from "./verify-onboarding";
+import { getOnboardingAdapter } from "./adapter";
 
 export const onboarding = <
 	Steps extends Record<string, OnboardingStep<any, any, any>>,
@@ -54,25 +54,14 @@ export const onboarding = <
 						cloneRequest: step.cloneRequest,
 					},
 					async (ctx): Promise<OnboardingStepReturnType<typeof step>> => {
-						const { session } = await verifyOnboarding(ctx);
+						const adapter = getOnboardingAdapter(options, ctx);
+						const { session } = await verifyOnboarding(ctx, {
+							adapter,
+							options,
+						});
 
-						const completedSteps = new Set<string>(
-							JSON.parse(
-								(
-									await ctx.context.adapter.findOne<{
-										completedSteps?: string;
-									}>({
-										model: "user",
-										where: [
-											{
-												field: "id",
-												value: session.user.id,
-											},
-										],
-										select: ["completedSteps"],
-									})
-								)?.completedSteps ?? "[]",
-							),
+						const completedSteps = await adapter.getCompletedSteps(
+							session.user.id,
 						);
 
 						if (step.once && completedSteps.has(id)) {
@@ -97,23 +86,14 @@ export const onboarding = <
 
 						const updatedSteps = [...completedSteps.add(id)];
 						const update: Record<string, any> = {
-							completedSteps: JSON.stringify(updatedSteps),
+							completedSteps: updatedSteps,
 						};
 
 						if (isCompletionStep) {
 							update.shouldOnboard = false;
 						}
 
-						await ctx.context.adapter.update({
-							model: "user",
-							where: [
-								{
-									field: "id",
-									value: session.user.id,
-								},
-							],
-							update,
-						});
+						await adapter.updateOnboardingState(session.user.id, update);
 
 						return {
 							completedSteps: updatedSteps,
@@ -131,24 +111,18 @@ export const onboarding = <
 						},
 					},
 					async (ctx): Promise<CanAccessOnboardingStepReturnType> => {
-						const { session } = await verifyOnboarding(ctx);
+						const adapter = getOnboardingAdapter(options, ctx);
+						const { session } = await verifyOnboarding(ctx, {
+							adapter,
+							options,
+						});
 
 						if (step.once) {
-							const { completedSteps } =
-								(await ctx.context.adapter.findOne<{
-									completedSteps?: string[];
-								}>({
-									model: "user",
-									where: [
-										{
-											field: "id",
-											value: session.user.id,
-										},
-									],
-									select: ["completedSteps"],
-								})) ?? {};
+							const completedSteps = await adapter.getCompletedSteps(
+								session.user.id,
+							);
 
-							if (completedSteps?.includes(id)) {
+							if (completedSteps?.has(id)) {
 								throw new APIError("FORBIDDEN", {
 									message: ONBOARDING_ERROR_CODES.STEP_ALREADY_COMPLETED,
 								});
@@ -168,25 +142,14 @@ export const onboarding = <
 						use: [sessionMiddleware],
 					},
 					async (ctx): Promise<SkipOnboardingStepReturnType> => {
-						const { session } = await verifyOnboarding(ctx);
+						const adapter = getOnboardingAdapter(options, ctx);
+						const { session } = await verifyOnboarding(ctx, {
+							adapter,
+							options,
+						});
 
-						const completedSteps = new Set<string>(
-							JSON.parse(
-								(
-									await ctx.context.adapter.findOne<{
-										completedSteps?: string;
-									}>({
-										model: "user",
-										where: [
-											{
-												field: "id",
-												value: session.user.id,
-											},
-										],
-										select: ["completedSteps"],
-									})
-								)?.completedSteps ?? "[]",
-							),
+						const completedSteps = await adapter.getCompletedSteps(
+							session.user.id,
 						);
 
 						if (completedSteps.has(id)) {
@@ -205,17 +168,8 @@ export const onboarding = <
 							});
 						}
 
-						await ctx.context.adapter.update({
-							model: "user",
-							where: [
-								{
-									field: "id",
-									value: session.user.id,
-								},
-							],
-							update: {
-								shouldOnboard: false,
-							},
+						await adapter.updateOnboardingState(session.user.id, {
+							shouldOnboard: false,
 						});
 
 						return {
@@ -236,7 +190,20 @@ export const onboarding = <
 	return {
 		id: "onboarding",
 		endpoints: {
-			shouldOnboard,
+			shouldOnboard: createAuthEndpoint(
+				"/onboarding/should-onboard",
+				{
+					method: "GET",
+					use: [sessionMiddleware],
+				},
+				async (ctx) => {
+					await verifyOnboarding(ctx, {
+						options,
+					});
+
+					return true;
+				},
+			),
 			...endpoints,
 		},
 		hooks: {
@@ -264,6 +231,7 @@ export const onboarding = <
 						);
 					},
 					handler: createAuthMiddleware(async (ctx) => {
+						const adapter = getOnboardingAdapter(options, ctx);
 						const data = ctx.context.newSession;
 						const enabled =
 							typeof opts.autoEnableOnSignUp === "function"
@@ -274,17 +242,8 @@ export const onboarding = <
 							return;
 						}
 
-						await ctx.context.adapter.update({
-							model: "user",
-							where: [
-								{
-									field: "id",
-									value: data.user.id,
-								},
-							],
-							update: {
-								shouldOnboard: true,
-							},
+						await adapter.updateOnboardingState(data.user.id, {
+							shouldOnboard: true,
 						});
 
 						return ctx.json({
@@ -303,7 +262,9 @@ export const onboarding = <
 				max: 3,
 			},
 		],
-		schema: mergeSchema(schema, opts?.schema),
+		schema: !options.secondaryStorage
+			? mergeSchema(schema, opts?.schema)
+			: undefined,
 		$ERROR_CODES: ONBOARDING_ERROR_CODES,
 		$Infer: {
 			OnboardingSteps: {} as Steps,
