@@ -14,7 +14,7 @@ const onboardingSchema = z
 	.nullish();
 
 export const getAuth = (
-	options?: Partial<OnboardingOptions>,
+	options?: Partial<OnboardingOptions<any, any>>,
 	authOptions?: {
 		plugins?: BetterAuthPlugin[];
 	},

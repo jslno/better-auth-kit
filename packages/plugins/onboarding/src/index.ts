@@ -1,4 +1,4 @@
-import type { AuthContext, BetterAuthPlugin, PrettifyDeep } from "better-auth";
+import type { BetterAuthPlugin, PrettifyDeep } from "better-auth";
 import { mergeSchema } from "better-auth/db";
 import { schema } from "./schema";
 import { ONBOARDING_ERROR_CODES } from "./error-codes";
@@ -7,21 +7,26 @@ import {
 	createAuthMiddleware,
 	APIError,
 	sessionMiddleware,
+	type AuthEndpoint,
 } from "better-auth/api";
 import { shouldOnboard } from "./routes/should-onboard";
 import type { OnboardingOptions, OnboardingStep } from "./types";
 import type {
 	CanAccessOnboardingStepReturnType,
+	InferSkipCompletionStep,
 	Merged,
 	OnboardingStepReturnType,
 	OnboardingStepsToEndpoints,
+	SkipOnboardingStepReturnType,
 } from "./internal-types";
 import { transformClientPath, transformPath } from "./utils";
 import { verifyOnboarding } from "./verify-onboarding";
-import { z } from "zod";
 
-export const onboarding = <Steps extends Record<string, OnboardingStep>>(
-	options: OnboardingOptions<Steps>,
+export const onboarding = <
+	Steps extends Record<string, OnboardingStep<any, any, any>>,
+	CompletionStep extends keyof Steps,
+>(
+	options: OnboardingOptions<Steps, CompletionStep>,
 ) => {
 	const opts = {
 		autoEnableOnSignUp: true,
@@ -37,7 +42,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 			const key = transformPath(id);
 			const path = transformClientPath(id);
 
-			const entries = Object.entries({
+			const endpoints: Record<string, AuthEndpoint> = {
 				[`onboardingStep${key}`]: createAuthEndpoint(
 					`/onboarding/step/${path}`,
 					{
@@ -125,9 +130,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 							SERVER_ONLY: true,
 						},
 					},
-					async (
-						ctx,
-					): Promise<CanAccessOnboardingStepReturnType<typeof step>> => {
+					async (ctx): Promise<CanAccessOnboardingStepReturnType> => {
 						const { session } = await verifyOnboarding(ctx);
 
 						if (step.once) {
@@ -155,11 +158,80 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 						return true;
 					},
 				),
-			});
+			};
 
-			return entries;
+			if (isCompletionStep && step.required !== true) {
+				endpoints[`skipOnboardingStep${key}`] = createAuthEndpoint(
+					`/onboarding/skip-step/${path}`,
+					{
+						method: "POST",
+						use: [sessionMiddleware],
+					},
+					async (ctx): Promise<SkipOnboardingStepReturnType> => {
+						const { session } = await verifyOnboarding(ctx);
+
+						const completedSteps = new Set<string>(
+							JSON.parse(
+								(
+									await ctx.context.adapter.findOne<{
+										completedSteps?: string;
+									}>({
+										model: "user",
+										where: [
+											{
+												field: "id",
+												value: session.user.id,
+											},
+										],
+										select: ["completedSteps"],
+									})
+								)?.completedSteps ?? "[]",
+							),
+						);
+
+						if (completedSteps.has(id)) {
+							throw new APIError("FORBIDDEN", {
+								message: ONBOARDING_ERROR_CODES.STEP_ALREADY_COMPLETED,
+							});
+						}
+						if (
+							requiredSteps
+								.filter(([key]) => key !== id)
+								.some(([key]) => !completedSteps.has(key))
+						) {
+							throw new APIError("FORBIDDEN", {
+								message:
+									ONBOARDING_ERROR_CODES.COMPLETE_REQUIRED_STEPS_BEFORE_COMPLETING_ONBOARDING,
+							});
+						}
+
+						await ctx.context.adapter.update({
+							model: "user",
+							where: [
+								{
+									field: "id",
+									value: session.user.id,
+								},
+							],
+							update: {
+								shouldOnboard: false,
+							},
+						});
+
+						return {
+							completedSteps: [...completedSteps],
+							data: null,
+						};
+					},
+				);
+			}
+
+			return Object.entries(endpoints);
 		}),
-	) as PrettifyDeep<Merged<OnboardingStepsToEndpoints<Steps>>>;
+	) as PrettifyDeep<
+		Merged<OnboardingStepsToEndpoints<Steps, CompletionStep>> &
+			InferSkipCompletionStep<Steps, CompletionStep>
+	>;
 
 	return {
 		id: "onboarding",
@@ -235,6 +307,7 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 		$ERROR_CODES: ONBOARDING_ERROR_CODES,
 		$Infer: {
 			OnboardingSteps: {} as Steps,
+			OnboardingCompletionStep: {} as CompletionStep,
 		},
 	} satisfies BetterAuthPlugin;
 };
@@ -242,12 +315,14 @@ export const onboarding = <Steps extends Record<string, OnboardingStep>>(
 export const createOnboardingStep = <
 	Schema extends Record<string, any> | undefined | null,
 	Result = unknown,
+	Required extends boolean = false,
 >(
-	def: OnboardingStep<Schema, Result>,
+	def: Omit<OnboardingStep<Schema, Result, Required>, "required"> &
+		(Required extends true ? { required: true } : { required?: Required }),
 ) => {
 	return {
 		once: true,
-		input: z.record(z.any()).nullish(),
+		required: (def.required ?? false) as Required,
 		...def,
 	};
 };

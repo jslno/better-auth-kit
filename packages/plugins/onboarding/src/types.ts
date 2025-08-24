@@ -13,7 +13,8 @@ type ActionEndpointContext<Schema = unknown, Result = unknown> = (
 ) => Result | Promise<Result>;
 
 export type OnboardingOptions<
-	Steps extends Record<string, OnboardingStep> = any,
+	Steps extends Record<string, OnboardingStep<any, any, any>>,
+	CompletionStep extends keyof Steps,
 > = {
 	/**
 	 * Map of onboarding steps keyed by a unique step identifier.
@@ -22,7 +23,7 @@ export type OnboardingOptions<
 	/**
 	 * The key of the step that, when completed, marks onboarding as finished.
 	 */
-	completionStep: keyof Steps;
+	completionStep: CompletionStep;
 	/**
 	 * Whether to automatically enable onboarding for new users during sign up
 	 * @default true
@@ -37,8 +38,9 @@ export type OnboardingOptions<
 };
 
 export type OnboardingStep<
-	Schema extends Record<string, any> | undefined | null = any,
-	Result = unknown,
+	Schema extends Record<string, any> | undefined | null,
+	Result,
+	Required extends boolean = false,
 > = {
 	/**
 	 * Optional Zod schema used to validate the request body for this step.
@@ -57,19 +59,20 @@ export type OnboardingStep<
 	 */
 	once?: boolean;
 	/**
+	 * If true headers will be required to be passed in the context
+	 */
+	requireHeaders?: boolean;
+	/**
+	 * If true request object will be required
+	 */
+	requireRequest?: boolean;
+	/**
+	 * Clone the request object from the router
+	 */
+	cloneRequest?: boolean;
+
+	/**
 	 * If true, this step must be completed before onboarding is considered done.
 	 */
 	required?: boolean;
-	/**
-     * If true headers will be required to be passed in the context
-     */
-    requireHeaders?: boolean;
-    /**
-     * If true request object will be required
-     */
-    requireRequest?: boolean;
-    /**
-     * Clone the request object from the router
-     */
-    cloneRequest?: boolean;
-};
+} & (Required extends true ? { required: true } : { required?: false });

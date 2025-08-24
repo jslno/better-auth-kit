@@ -4,22 +4,24 @@ import { toPath } from "./utils";
 
 type InferSteps<T> = T extends {
 	$Infer: {
-		OnboardingSteps: infer Steps extends Record<string, OnboardingStep>;
+		OnboardingSteps: infer Steps extends Record<
+			string,
+			OnboardingStep<any, any, any>
+		>;
 	};
 }
 	? Steps
-	: T extends Record<string, OnboardingStep>
+	: T extends Record<string, OnboardingStep<any, any, any>>
 		? T
 		: never;
 
 export const onboardingClient = <
-	Steps extends
-		| {
-				$Infer: {
-					OnboardingSteps: Record<string, OnboardingStep>;
-				};
-		  }
-		| Record<string, OnboardingStep>,
+	Steps extends {
+		$Infer: {
+			OnboardingSteps: Record<string, OnboardingStep<any, any, any>>;
+			OnboardingCompletionStep: string;
+		};
+	},
 >(options?: {
 	/**
 	 * a redirect function to call if a user needs
@@ -29,7 +31,12 @@ export const onboardingClient = <
 }) => {
 	return {
 		id: "onboarding",
-		$InferServerPlugin: {} as ReturnType<typeof onboarding<InferSteps<Steps>>>,
+		$InferServerPlugin: {} as ReturnType<
+			typeof onboarding<
+				InferSteps<Steps>,
+				Steps["$Infer"]["OnboardingCompletionStep"]
+			>
+		>,
 		atomListeners: [
 			{
 				matcher: (path) => path.startsWith("/onboarding/"),
@@ -55,13 +62,15 @@ export const onboardingClient = <
 						const basePath = basePathRaw.endsWith("/")
 							? basePathRaw.slice(0, -1)
 							: basePathRaw;
-						if (!urlPath.startsWith(`${basePath}/onboarding/step/`)) {
-							return;
+						if (
+							urlPath.startsWith(`${basePath}/onboarding/step/`) ||
+							urlPath.startsWith(`${basePath}/onboarding/skip-step/`)
+						) {
+							return {
+								...context,
+								method: "POST",
+							};
 						}
-						return {
-							...context,
-							method: "POST",
-						};
 					},
 				},
 			},

@@ -296,4 +296,111 @@ describe("Onboarding", () => {
 			expect(r2.data.completedSteps).toEqual(["profile", "newPassword"]);
 		});
 	});
+
+	describe("(skip completion step)", async () => {
+		const auth = getAuth({
+			steps: {
+				profile: {
+					handler: async () => true,
+					required: true,
+				},
+				preferences: {
+					handler: async () => true,
+				},
+			},
+			completionStep: "preferences",
+		});
+
+		const { resetDatabase, client, signUpWithTestUser, db, testUser } =
+			await getTestInstance(auth, {
+				clientOptions: {
+					plugins: [
+						onboardingClient({
+							onOnboardingRedirect: () => Promise.resolve(),
+						}),
+					],
+				},
+				shouldRunMigrations: true,
+			});
+
+		let headers: Headers;
+		beforeAll(async () => {
+			await resetDatabase();
+			const result = await signUpWithTestUser();
+			headers = result.headers;
+		});
+
+		beforeEach(async () => {
+			await db.update({
+				model: "user",
+				where: [
+					{
+						field: "email",
+						value: testUser.email,
+					},
+				],
+				update: {
+					shouldOnboard: true,
+					completedSteps: "[]",
+				},
+			});
+		});
+
+		it("should allow skipping non-required completion step", async () => {
+			await client.onboarding.step.profile({
+				fetchOptions: { headers },
+			});
+
+			const res = await client.onboarding.skipStep.preferences({
+				fetchOptions: { headers },
+			});
+
+			if (res.error) throw res.error;
+			expect(res.data.completedSteps).toEqual(["profile"]);
+			expect(res.data.data).toBe(null);
+		});
+
+		it("should forbid skipping completion step before required steps are completed", async () => {
+			const res = await client.onboarding.skipStep.preferences({
+				fetchOptions: { headers },
+			});
+
+			expect(res.error?.status).toBe(403);
+			expect(res.error?.message).toBe(
+				ONBOARDING_ERROR_CODES.COMPLETE_REQUIRED_STEPS_BEFORE_COMPLETING_ONBOARDING,
+			);
+		});
+
+		it("should forbid skipping already completed step", async () => {
+			await client.onboarding.step.profile({
+				fetchOptions: { headers },
+			});
+
+			await client.onboarding.step.preferences({
+				fetchOptions: { headers },
+			});
+
+			const res = await client.onboarding.skipStep.preferences({
+				fetchOptions: { headers },
+			});
+
+			expect(res.error?.status).toBe(403);
+		});
+
+		it("should mark onboarding as complete when skipping non-required completion step", async () => {
+			await client.onboarding.step.profile({
+				fetchOptions: { headers },
+			});
+
+			await client.onboarding.skipStep.preferences({
+				fetchOptions: { headers },
+			});
+
+			const { data: needsOnboarding } = await client.onboarding.shouldOnboard({
+				fetchOptions: { headers },
+			});
+
+			expect(needsOnboarding).not.toBe(true);
+		});
+	});
 });
