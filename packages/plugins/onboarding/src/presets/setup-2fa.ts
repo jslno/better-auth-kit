@@ -21,7 +21,7 @@ export const setup2FAStep = <O extends Setup2FAOptions>(options?: O) => {
 			);
 
 			if (!plugin?.endpoints) {
-				throw new APIError("INTERNAL_SERVER_ERROR", {
+				throw new APIError("FAILED_DEPENDENCY", {
 					message: "2FA is not set up.",
 				});
 			}
