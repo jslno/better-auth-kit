@@ -98,12 +98,6 @@ export type AppInviteOptions = {
 	 */
 	cleanupPersonalInvitesOnDecision?: boolean;
 	/**
-	 * Store invitations in secondary storage in addition to the primary database.
-	 *
-	 * @default false
-	 */
-	secondaryStorage?: boolean;
-	/**
 	 * If true, mark the user's email as verified upon accepting an invitation
 	 *
 	 * @default true

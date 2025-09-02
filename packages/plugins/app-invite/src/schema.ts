@@ -18,44 +18,6 @@ export type AppInvitationInput = z.input<typeof appInvitationSchema>;
 export type AppInvitationStatus = z.infer<typeof appInvitationStatus>;
 export type AppInvitationStatusInput = z.input<typeof appInvitationStatus>;
 
-export const schema = {
-	appInvitation: {
-		fields: {
-			inviterId: {
-				type: "string",
-				required: true,
-				references: {
-					model: "user",
-					field: "id",
-				},
-			},
-			name: {
-				type: "string",
-				required: false,
-				input: true,
-			},
-			email: {
-				type: "string",
-				required: false,
-				input: true,
-			},
-			status: {
-				type: ["pending", "accepted", "rejected", "canceled"] as const,
-				required: true,
-				defaultValue: "pending",
-			},
-			expiresAt: {
-				type: "date",
-				required: false,
-			},
-			domainWhitelist: {
-				type: "string",
-				required: false,
-			},
-		},
-	},
-} satisfies AuthPluginSchema;
-
 const createPersonalInvitationSchema = z.object({
 	type: z.literal("personal"),
 	name: z

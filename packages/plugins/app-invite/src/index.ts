@@ -1,7 +1,7 @@
 import type { BetterAuthPlugin } from "better-auth";
 import type { AppInviteOptions } from "./types";
 import { APP_INVITE_ERROR_CODES } from "./error-codes";
-import { schema, type AppInvitation, type AppInvitationStatus } from "./schema";
+import type { AppInvitation } from "./schema";
 import {
 	createAppInvitation,
 	getAppInvitation,
@@ -56,18 +56,51 @@ export const appInvite = <O extends AppInviteOptions, S extends boolean = true>(
 				...options.rateLimit,
 			},
 		],
-		schema: !options.secondaryStorage
-			? {
-					...schema,
-					appInvitation: {
-						...schema.appInvitation,
-						fields: {
-							...schema.appInvitation.fields,
-							...options.schema?.appInvitation?.additionalFields,
+		schema: {
+			appInvitation: {
+				modelName: options.schema?.appInvitation?.modelName,
+				fields: {
+					inviterId: {
+						fieldName: options.schema?.appInvitation?.fields?.inviterId,
+						type: "string",
+						required: true,
+						references: {
+							model: "user",
+							field: "id",
 						},
 					},
-				}
-			: undefined,
+					name: {
+						fieldName: options.schema?.appInvitation?.fields?.name,
+						type: "string",
+						required: false,
+						input: true,
+					},
+					email: {
+						fieldName: options.schema?.appInvitation?.fields?.email,
+						type: "string",
+						required: false,
+						input: true,
+					},
+					status: {
+						fieldName: options.schema?.appInvitation?.fields?.status,
+						type: ["pending", "accepted", "rejected", "canceled"] as const,
+						required: true,
+						defaultValue: "pending",
+					},
+					expiresAt: {
+						fieldName: options.schema?.appInvitation?.fields?.expiresAt,
+						type: "date",
+						required: false,
+					},
+					domainWhitelist: {
+						fieldName: options.schema?.appInvitation?.fields?.domainWhitelist,
+						type: "string",
+						required: false,
+					},
+					...(options.schema?.appInvitation?.additionalFields || {}),
+				},
+			},
+		},
 		$Infer: {
 			AppInvitation: {} as AppInvitation &
 				typeof additionalFields.$ReturnAdditionalFields,
