@@ -141,7 +141,6 @@ export const acceptAppInvitation = <
 			},
 		},
 		async (ctx) => {
-			console.log("body", ctx.body);
 			if (ctx.context.session?.session) {
 				throw new APIError("FORBIDDEN");
 			}
@@ -183,11 +182,28 @@ export const acceptAppInvitation = <
 				});
 			}
 
-			const userData = {
+			let userData = {
 				name: invitation.name || ctx.body.name,
 				email: invitation.email || ctx.body.email,
 				...ctx.body.additionalFields,
 			} as User & Record<string, any>;
+
+			const dbUser = await ctx.context.internalAdapter.findUserByEmail(
+				userData.email,
+			);
+			if (dbUser?.user) {
+				ctx.context.logger.info(
+					`Sign-up attempt for existing email: ${userData.email}`,
+				);
+				throw new APIError("UNPROCESSABLE_ENTITY", {
+					message: BASE_ERROR_CODES.USER_ALREADY_EXISTS,
+				});
+			}
+
+			const before = await options.hooks?.accept?.before?.(ctx, userData);
+			if (before?.user) {
+				userData = before.user;
+			}
 			const isValidEmail = z.email().safeParse(userData.email);
 
 			if (!isValidEmail.success) {
@@ -227,18 +243,6 @@ export const acceptAppInvitation = <
 				ctx.context.logger.error("Password is too long");
 				throw new APIError("BAD_REQUEST", {
 					message: BASE_ERROR_CODES.PASSWORD_TOO_LONG,
-				});
-			}
-
-			const dbUser = await ctx.context.internalAdapter.findUserByEmail(
-				userData.email,
-			);
-			if (dbUser?.user) {
-				ctx.context.logger.info(
-					`Sign-up attempt for existing email: ${userData.email}`,
-				);
-				throw new APIError("UNPROCESSABLE_ENTITY", {
-					message: BASE_ERROR_CODES.USER_ALREADY_EXISTS,
 				});
 			}
 
@@ -296,6 +300,11 @@ export const acceptAppInvitation = <
 					acceptedI = await adapter.updateInvitation(invitation.id, "accepted");
 				}
 			}
+
+			await options.hooks?.accept?.after?.(ctx, {
+				invitation: acceptedI!,
+				user: createdUser,
+			});
 
 			if (!options.verifyEmailOnAccept) {
 				if (
@@ -361,21 +370,16 @@ export const acceptAppInvitation = <
 			const session = await ctx.context.internalAdapter.createSession(
 				createdUser.id,
 				ctx,
-				// TODO: Remember me
 			);
 			if (!session) {
 				throw new APIError("BAD_REQUEST", {
 					message: BASE_ERROR_CODES.FAILED_TO_CREATE_SESSION,
 				});
 			}
-			await setSessionCookie(
-				ctx,
-				{
-					session,
-					user: createdUser,
-				},
-				// TODO: Remember me
-			);
+			await setSessionCookie(ctx, {
+				session,
+				user: createdUser,
+			});
 			if (!ctx.query?.callbackURL) {
 				return ctx.json({
 					token: session.token,

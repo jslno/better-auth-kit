@@ -125,13 +125,14 @@ export const createAppInvitation = <
 				}
 			}
 
+			await options.hooks?.create?.before?.(ctx);
+
 			const invitation = await adapter.createInvitation<ReturnAdditionalFields>(
 				ctx.body,
 				session.user,
 			);
 
 			if (invitation.email && ctx.body.type === "personal") {
-				// TODO:
 				await options.sendInvitationEmail?.(
 					{
 						...invitation,
@@ -141,6 +142,8 @@ export const createAppInvitation = <
 					ctx.request,
 				);
 			}
+
+			await options.hooks?.create?.after?.(ctx, invitation);
 
 			return invitation;
 		},

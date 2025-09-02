@@ -5,6 +5,7 @@ import type { AppInviteOptions } from "../types";
 import { getAppInviteAdapter } from "../adapter";
 import { APP_INVITE_ERROR_CODES } from "../error-codes";
 import type { getAdditionalFields } from "../utils";
+import type { AppInvitation } from "../schema";
 
 export const cancelAppInvitation = <
 	O extends AppInviteOptions,
@@ -75,11 +76,22 @@ export const cancelAppInvitation = <
 						APP_INVITE_ERROR_CODES.YOU_ARE_NOT_ALLOWED_TO_CANCEL_THIS_APP_INVITATION,
 				});
 			}
-			const canceledI = await adapter.updateInvitation<ReturnAdditionalFields>(
-				invitation.id,
-				"canceled",
-			);
-			return ctx.json(canceledI);
+
+			await options.hooks?.cancel?.before?.(ctx, invitation);
+
+			let canceledI: AppInvitation | null = invitation;
+			if (options.cleanupPersonalInvitesOnDecision) {
+				await adapter.deleteInvitation(invitation.id);
+			} else {
+				canceledI = await adapter.updateInvitation<ReturnAdditionalFields>(
+					invitation.id,
+					"canceled",
+				);
+			}
+
+			await options.hooks?.cancel?.after?.(ctx, canceledI!);
+
+			return ctx.json(canceledI as (AppInvitation & ReturnAdditionalFields) | null);
 		},
 	);
 };

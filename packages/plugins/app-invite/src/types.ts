@@ -43,7 +43,7 @@ export type AppInviteOptions = {
 	 *
 	 * 	@example
 	 * ```ts
-	 * allowUserToCreateInvitation: async (user) => {
+	 * canCreateInvitation: async (user) => {
 	 * 		const canInvite: boolean = await hasPermission(user, 'send-invitation');
 	 *      return canInvite;
 	 * }
@@ -120,6 +120,58 @@ export type AppInviteOptions = {
 	rateLimit?: {
 		window: number;
 		max: number;
+	};
+	/**
+	 * Invitation lifecycle hooks
+	 */
+	hooks?: {
+		create?: {
+			before?: (ctx: GenericEndpointContext) => Promise<void> | void;
+			after?: (
+				ctx: GenericEndpointContext,
+				invitation: AppInvitation & Record<string, any>,
+			) => Promise<void> | void;
+		};
+		accept?: {
+			before?: (
+				ctx: GenericEndpointContext,
+				userToCreate: Partial<User> & { email: string } & Record<string, any>,
+			) =>
+				| Promise<{
+						user?: User & Record<string, any>;
+				  } | void>
+				| {
+						user?: User & Record<string, any>;
+				  }
+				| void;
+			after?: (
+				ctx: GenericEndpointContext,
+				data: {
+					invitation: AppInvitation & Record<string, any>;
+					user: User & Record<string, any>;
+				},
+			) => Promise<void> | void;
+		};
+		reject?: {
+			before?: (
+				ctx: GenericEndpointContext,
+				invitation: AppInvitation & Record<string, any>,
+			) => Promise<void> | void;
+			after?: (
+				ctx: GenericEndpointContext,
+				invitation: AppInvitation & Record<string, any>,
+			) => Promise<void> | void;
+		};
+		cancel?: {
+			before?: (
+				ctx: GenericEndpointContext,
+				invitation: AppInvitation & Record<string, any>,
+			) => Promise<void> | void;
+			after?: (
+				ctx: GenericEndpointContext,
+				invitation: AppInvitation & Record<string, any>,
+			) => Promise<void> | void;
+		};
 	};
 	/**
 	 * The schema for the app-invite plugin.

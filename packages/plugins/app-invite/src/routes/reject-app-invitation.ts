@@ -115,12 +115,18 @@ export const rejectAppInvitation = <
 					message: APP_INVITE_ERROR_CODES.THIS_APP_INVITATION_CANT_BE_REJECTED,
 				});
 			}
+
+			await options.hooks?.reject?.before?.(ctx, invitation);
+
 			let rejectedI: AppInvitation | null = invitation;
 			if (options.cleanupPersonalInvitesOnDecision) {
 				await adapter.deleteInvitation(invitation.id);
 			} else {
 				rejectedI = await adapter.updateInvitation(invitation.id, "rejected");
 			}
+
+			await options.hooks?.reject?.after?.(ctx, rejectedI!);
+
 			return ctx.json({
 				token: null,
 				invitation: rejectedI as
