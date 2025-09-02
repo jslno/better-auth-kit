@@ -4,8 +4,8 @@ import { appInvite } from "../src";
 import { appInviteClient } from "../src/client";
 import { createAuthClient } from "better-auth/client";
 import { inferAdditionalFields } from "better-auth/client/plugins";
-import { APP_INVITE_ERROR_CODES } from "../src/error-codes";
 import { betterAuth } from "better-auth";
+import { APP_INVITE_ERROR_CODES } from "../src/error-codes";
 
 const mockFn = vi.fn();
 const auth = betterAuth({
@@ -34,18 +34,38 @@ const auth = betterAuth({
 	plugins: [
 		appInvite({
 			autoSignIn: true,
-			allowUserToCreateInvitation: (user) => {
-				return user.email !== "test7@test.com";
+			canCreateInvitation: (ctx) => {
+				return ctx.context.session?.user.email !== "test7@test.com";
 			},
 			sendInvitationEmail: async (data, request) => {
 				mockFn(data);
 			},
-			$Infer: {
-				AdditionalFields: {} as {
-					newField?: string;
-					nonRequiredField?: string;
+			schema: {
+				appInvitation: {
+					additionalFields: {
+						newInviteField: {
+							type: "string",
+							required: true
+						},
+						nonRequiredInviteField: {
+							type: "string",
+							required: false,
+						}
+					}
 				},
-			},
+				user: {
+					additionalFields: {
+						newField: {
+							type: "string",
+							required: true
+						},
+						nonRequiredField: {
+							type: "string",
+							required: false,
+						}
+					}
+				}
+			}
 		}),
 	],
 });
@@ -63,12 +83,32 @@ describe("App Invite", async (it) => {
 		clientOptions: {
 			plugins: [
 				appInviteClient({
-					$Infer: {
-						AdditionalFields: {} as {
-							newField?: string;
-							nonRequiredField?: string;
+					schema: {
+						appInvitation: {
+							additionalFields: {
+								newInviteField: {
+									type: "string",
+									required: true
+								},
+								nonRequiredInviteField: {
+									type: "string",
+									required: false,
+								}
+							}
 						},
-					},
+						user: {
+							additionalFields: {
+								newField: {
+									type: "string",
+									required: true
+								},
+								nonRequiredField: {
+									type: "string",
+									required: false,
+								}
+							}
+						}
+					}
 				}),
 				inferAdditionalFields({
 					user: {
@@ -92,8 +132,13 @@ describe("App Invite", async (it) => {
 			const invitation = await auth.api.createAppInvitation({
 				headers: user.headers,
 				body: {
+					type: "personal",
 					email: "email1@test.com",
 					name: "Test User",
+					additionalFields: {
+						newInviteField: "",
+						nonRequiredInviteField: "",
+					},
 				},
 			});
 			const headers = new Headers();
@@ -101,13 +146,16 @@ describe("App Invite", async (it) => {
 				{
 					invitationId: invitation.id,
 					password: "password",
-					newField: "new-field",
+					additionalFields: {
+						newField: "new-field",
+					},
 				},
 				{
 					onSuccess: sessionSetter(headers),
 				},
 			);
-
+			
+			console.log(res.data);
 			expect(res.data?.token).toBeDefined();
 			expect(res.data?.user.email).toBe("email1@test.com");
 			expect(res.data?.user.name).toBe("Test User");
@@ -115,7 +163,7 @@ describe("App Invite", async (it) => {
 				res.data!.user.id,
 			);
 			expect(accounts).toHaveLength(1);
-
+			
 			const session = await client.getSession({
 				fetchOptions: {
 					headers,
@@ -128,7 +176,12 @@ describe("App Invite", async (it) => {
 			const invitation = await auth.api.createAppInvitation({
 				headers: user.headers,
 				body: {
+					type: "personal",
 					email: "email2@test.com",
+					additionalFields: {
+						newInviteField: "",
+						nonRequiredInviteField: "",
+					},
 				},
 			});
 			const res = await auth.api.acceptAppInvitation({
@@ -136,6 +189,10 @@ describe("App Invite", async (it) => {
 					invitationId: invitation.id,
 					name: "Test Name",
 					password: "password",
+					additionalFields: {
+						newField: "",
+						nonRequiredField: "",
+					}
 				},
 			});
 			expect(res.token).toBeDefined();
@@ -151,6 +208,10 @@ describe("App Invite", async (it) => {
 						invitationId: "not a valid id",
 						name: "Test Name",
 						password: "password",
+						additionalFields: {
+							newField: "",
+							nonRequiredField: "",
+						}
 					},
 				})
 				.catch((e) => {});
@@ -160,7 +221,34 @@ describe("App Invite", async (it) => {
 
 	const client2 = createAuthClient({
 		baseURL: "http://localhost:3000",
-		plugins: [appInviteClient()],
+		plugins: [appInviteClient({
+			schema: {
+				appInvitation: {
+					additionalFields: {
+						newInviteField: {
+							type: "string",
+							required: true
+						},
+						nonRequiredInviteField: {
+							type: "string",
+							required: false,
+						}
+					}
+				},
+				user: {
+					additionalFields: {
+						newField: {
+							type: "string",
+							required: true
+						},
+						nonRequiredField: {
+							type: "string",
+							required: false,
+						}
+					}
+				}
+			}
+		})],
 		fetchOptions: {
 			customFetchImpl,
 		},
@@ -171,7 +259,12 @@ describe("App Invite", async (it) => {
 			email: "test3@test.com",
 		};
 		const invite = await client.inviteUser({
+			type: "personal",
 			email: newUser.email,
+			additionalFields: {
+				newInviteField: "",
+				nonRequiredInviteField: "",
+			},
 			fetchOptions: {
 				headers: user.headers,
 			},
@@ -183,7 +276,12 @@ describe("App Invite", async (it) => {
 	describe("should allow inviting multiple users with a single link", async (it) => {
 		const invitation = await auth.api.createAppInvitation({
 			body: {
+				type: "public",
 				domainWhitelist: "test.com, test2.com",
+				additionalFields: {
+					newInviteField: "",
+					nonRequiredInviteField: ""
+				},
 			},
 			headers: user.headers,
 		});
@@ -246,6 +344,9 @@ describe("App Invite", async (it) => {
 						name: invitee.name,
 						email: invitee.email,
 						password: invitee.password,
+						additionalFields: {
+							newField: "new-field",
+						}
 					});
 					if (action === "accept-invitation") {
 						expect(res.data?.user.email).toBe(invitee.email);
@@ -273,7 +374,11 @@ describe("App Invite", async (it) => {
 			email: "test4@test.com",
 		};
 		const invite = await client2.inviteUser({
+			type: "personal",
 			email: newUser.email,
+			additionalFields: {
+				newInviteField: ""
+			},
 			fetchOptions: {
 				headers: user.headers,
 			},
@@ -313,7 +418,11 @@ describe("App Invite", async (it) => {
 			email: "test6@test.com",
 		};
 		const invite = await client2.inviteUser({
+			type: "personal",
 			email: newUser.email,
+			additionalFields: {
+				newInviteField: "",
+			},
 			fetchOptions: {
 				headers: user.headers,
 			},
@@ -346,7 +455,11 @@ describe("App Invite", async (it) => {
 			"password123456",
 		);
 		const res = await client2.inviteUser({
+			type: "personal",
 			email: "test8@test.com",
+			additionalFields: {
+				newInviteField: "",
+			},
 			fetchOptions: {
 				headers: anotherUser.headers,
 			},

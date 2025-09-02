@@ -1,47 +1,151 @@
-import type { AppInviteOptions } from ".";
 import type { AuthContext, User, Where } from "better-auth";
-import type { AppInvitationInput, AppInvitation } from "./schema";
+import type { AppInviteOptions } from "./types";
+import type {
+	AppInvitation,
+	AppInvitationInput,
+	AppInvitationStatus,
+	CreateInvitation,
+} from "./schema";
 import { getDate } from "./utils";
+
+type WithAdditionalFields<
+	T,
+	AdditionalFields extends Record<string, any> = Record<string, any>,
+> = T & {
+	additionalFields?: {} | AdditionalFields;
+};
 
 export const getAppInviteAdapter = (
 	context: AuthContext,
 	options?: AppInviteOptions,
 ) => {
 	const adapter = context.adapter;
-	return {
-		createInvitation: async ({
-			invitation,
-			user,
-		}: {
-			invitation: {
-				name?: string;
-				email?: string;
-				domainWhitelist?: string;
-			};
-			user: User;
-		}) => {
-			const defaultExpiration = 1000 * 60 * 60 * 48;
-			const expiresAt = getDate(
-				options?.invitationExpiresIn || defaultExpiration,
-			);
-			const invite = await adapter.create<AppInvitationInput, AppInvitation>({
-				model: "appInvitation",
-				data: {
-					name: invitation.email ? invitation.name : undefined,
-					email: invitation.email,
-					status: "pending",
-					expiresAt,
-					inviterId: user.id,
-					domainWhitelist: !invitation.email
-						? invitation.domainWhitelist
-						: undefined,
-				},
-			});
 
-			return invite;
+	return {
+		createInvitation: async <AdditionalFields extends Record<string, any>>(
+			invitation: WithAdditionalFields<CreateInvitation, AdditionalFields>,
+			user: User,
+		) => {
+			const defaultExpiration = 1000 * 60 * 60 * 48;
+			const expiresAt =
+				options?.invitationExpiresIn === null
+					? undefined
+					: getDate(options?.invitationExpiresIn || defaultExpiration);
+
+			const newInvite = await adapter.create<AppInvitationInput, AppInvitation>(
+				{
+					model: "appInvitation",
+					data: {
+						inviterId: user.id,
+						status: "pending",
+						expiresAt,
+						...(invitation.type === "personal"
+							? {
+									name: invitation.name,
+									email: invitation.email,
+								}
+							: {
+									domainWhitelist: Array.isArray(invitation.domainWhitelist)
+										? invitation.domainWhitelist.join(",")
+										: invitation.domainWhitelist,
+								}),
+						...invitation.additionalFields,
+					},
+				},
+			);
+
+			const data = {
+				...newInvite,
+			} as AppInvitation & AdditionalFields;
+
+			return data;
 		},
-		findInvitationById: async (id: string) => {
-			const invitation = await adapter.findOne<AppInvitation>({
+		findInvitationById: async <AdditionalFields extends Record<string, any>>(
+			id: string,
+			data?: {
+				where?: Where[];
+			},
+		) => {
+			const invitation = await adapter.findOne<
+				AppInvitation & AdditionalFields
+			>({
+				model: "appInvitation",
+				where: [
+					{
+						field: "id",
+						value: id,
+					},
+					...(data?.where ?? []),
+				],
+			});
+			return invitation;
+		},
+		findInvitationByEmail: async <AdditionalFields extends Record<string, any>>(
+			email: string,
+			data?: {
+				where?: Where[];
+			},
+		) => {
+			const invitation = await adapter.findOne<
+				AppInvitation & AdditionalFields
+			>({
+				model: "appInvitation",
+				where: [
+					{
+						field: "email",
+						value: email,
+					},
+					...(data?.where ?? []),
+				],
+			});
+			return invitation;
+		},
+		updateInvitation: async <AdditionalFields extends Record<string, any>>(
+			id: string,
+			status: Exclude<AppInvitationStatus, "pending">,
+		) => {
+			const invitation = await adapter.update<AppInvitation & AdditionalFields>(
+				{
+					model: "appInvitation",
+					where: [
+						{
+							field: "id",
+							value: id,
+						},
+					],
+					update: {
+						status,
+					},
+				},
+			);
+			return invitation;
+		},
+		listInvitations: async <
+			AdditionalFields extends Record<string, any>,
+		>(data?: {
+			limit?: number;
+			offset?: number;
+			sortBy?: {
+				field: string;
+				direction: "asc" | "desc";
+			};
+			where?: Where[];
+		}) => {
+			return adapter.findMany<AppInvitation & AdditionalFields>({
+				model: "appInvitation",
+				...data,
+			});
+		},
+		countInvitations: async (data?: {
+			where?: Where[];
+		}) => {
+			return adapter.count({
+				model: "appInvitation",
+				...data,
+			});
+		},
+		deleteInvitation: async (id: string) => {
+			await adapter.delete({
 				model: "appInvitation",
 				where: [
 					{
@@ -50,73 +154,6 @@ export const getAppInviteAdapter = (
 					},
 				],
 			});
-			return invitation;
-		},
-		findPendingInvitation: async (data: { email: string }) => {
-			const invitation = await adapter.findOne<AppInvitation>({
-				model: "appInvitation",
-				where: [
-					{
-						field: "email",
-						value: data.email,
-					},
-					{
-						field: "status",
-						value: "pending",
-					},
-				],
-			});
-
-			if (invitation && new Date(invitation.expiresAt) > new Date()) {
-				return invitation;
-			}
-
-			return undefined;
-		},
-		listInvitationsByIssuer: async (
-			inviterId: string,
-			limit?: number,
-			offset?: number,
-			sortBy?: {
-				field: string;
-				direction: "asc" | "desc";
-			},
-			where?: Where[],
-		) => {
-			const invitations = await adapter.findMany<AppInvitation>({
-				model: "appInvitation",
-				where: [
-					...(where || []),
-					{
-						field: "inviterId",
-						operator: "eq",
-						value: inviterId,
-					},
-				],
-				limit,
-				offset,
-				sortBy,
-			});
-
-			return invitations;
-		},
-		updateInvitation: async (data: {
-			invitationId: string;
-			status: "accepted" | "canceled" | "rejected";
-		}) => {
-			const invitation = await adapter.update<AppInvitation>({
-				model: "appInvitation",
-				where: [
-					{
-						field: "id",
-						value: data.invitationId,
-					},
-				],
-				update: {
-					status: data.status,
-				},
-			});
-			return invitation;
 		},
 	};
 };
